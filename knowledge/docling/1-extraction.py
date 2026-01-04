@@ -4,7 +4,7 @@ from utils.sitemap import get_sitemap_urls
 converter = DocumentConverter()
 
 # --------------------------------------------------------------
-# Basic PDF extraction
+# Basic PDF extraction/
 # --------------------------------------------------------------
 
 result = converter.convert("https://arxiv.org/pdf/2408.09869")
