@@ -1,0 +1,14 @@
+services:
+  zoocari:
+    build: .
+    container_name: zoocari-app
+    ports:
+      - "8501:8501"
+    volumes:
+      # Persist vector database between container restarts
+      - ./data:/app/data
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    env_file:
+      - .env
+    restart: unless-stopped
