@@ -43,9 +43,10 @@ ZUCARI_SYSTEM_PROMPT = """You are Zoocari the Elephant, the friendly animal expe
 1. ONLY answer questions using information from the CONTEXT provided below
 2. If the context doesn't contain information to answer the question, say: "Hmm, I don't know about that yet! Maybe ask one of the zookeepers when you visit Leesburg Animal Park, or check out a book from your library! 📚"
 3. NEVER make up facts or guess - kids trust you!
-4. Keep answers short (2-4 short paragraphs max)
+4. Keep answers short (4-6 short paragraphs max)
 5. Use age-appropriate language - no complex scientific terms without explanation
 6. Handle nature's realities gently (predators hunt, but no graphic details)
+7. Include 2 or 3 fun facts/statistics to make learning fun
 
 📝 RESPONSE FORMAT:
 1. Start with an enthusiastic greeting related to the question
@@ -60,7 +61,7 @@ ZUCARI_SYSTEM_PROMPT = """You are Zoocari the Elephant, the friendly animal expe
 The follow-up questions should:
 - Be related to what you just talked about
 - Be things kids would find interesting
-- Be about animals they might see at Leesburg Animal Park or learn about
+- Be about insteresting animal facts or behaviors
 
 CONTEXT (Use ONLY this information to answer):
 {context}
@@ -72,6 +73,11 @@ Remember: You're Zoocari the Elephant at Leesburg Animal Park! Be fun, be accura
 # ============================================================
 
 import re
+
+def set_pending_question(question: str):
+    """Callback to set pending question - avoids double-click issue."""
+    st.session_state.pending_question = question
+
 
 def extract_followup_questions(response: str) -> tuple[str, list[str]]:
     """
@@ -205,47 +211,24 @@ st.markdown("""
     }
 
     /* ============================================
-       FULL HEIGHT LAYOUT
+       BASE LAYOUT (mobile-first)
        ============================================ */
-
-    /* Make app use full viewport */
-    .stApp, .main, [data-testid="stAppViewContainer"] {
-        height: 100vh !important;
-        overflow: hidden !important;
-    }
-
-    /* Remove ALL padding from main content */
     [data-testid="stAppViewBlockContainer"] {
         padding: 0 !important;
-        height: 100vh !important;
     }
 
     .main .block-container {
         padding: 10px 20px !important;
         max-width: 100% !important;
-        height: 100% !important;
     }
 
-    /* Make columns fill height */
     [data-testid="stHorizontalBlock"] {
-        height: calc(100vh - 20px) !important;
         align-items: stretch !important;
     }
 
-    .stColumn {
-        height: 100% !important;
-    }
-
-    /* Style the scrollable containers - make them fill available space */
-    [data-testid="stVerticalBlockBorderWrapper"] {
-        height: calc(100vh - 40px) !important;
-        max-height: calc(100vh - 40px) !important;
-    }
-
+    /* Panel styling */
     [data-testid="stVerticalBlockBorderWrapper"] > div,
     [data-testid="stVerticalBlockBorderWrapper"] > div[style*="height"] {
-        height: calc(100vh - 40px) !important;
-        max-height: calc(100vh - 40px) !important;
         border-radius: 16px !important;
         background-color: var(--leesburg-white) !important;
         box-shadow: 0 4px 24px rgba(61, 51, 42, 0.12) !important;
@@ -645,6 +628,242 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(242, 144, 33, 0.4) !important;
     }
 
+    /* ============================================
+       DESKTOP FIXED HEIGHT PANELS
+       ============================================ */
+    @media screen and (min-width: 769px) {
+        .stApp, .main, [data-testid="stAppViewContainer"] {
+            height: 100vh !important;
+            overflow: hidden !important;
+        }
+
+        [data-testid="stAppViewBlockContainer"] {
+            height: 100vh !important;
+        }
+
+        [data-testid="stHorizontalBlock"] {
+            height: calc(100vh - 20px) !important;
+        }
+
+        .stColumn {
+            height: 100% !important;
+        }
+
+        [data-testid="stVerticalBlockBorderWrapper"],
+        [data-testid="stVerticalBlockBorderWrapper"] > div {
+            height: calc(100vh - 40px) !important;
+            max-height: calc(100vh - 40px) !important;
+            overflow-y: auto !important;
+        }
+    }
+
+    /* ============================================
+       MOBILE RESPONSIVE STYLES
+       ============================================ */
+    @media screen and (max-width: 768px) {
+        /* Improve touch scrolling */
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Allow page to scroll naturally on mobile */
+        .stApp, .main, [data-testid="stAppViewContainer"] {
+            height: auto !important;
+            min-height: 100vh !important;
+            overflow: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+
+        [data-testid="stAppViewBlockContainer"] {
+            height: auto !important;
+            padding: 10px !important;
+        }
+
+        .main .block-container {
+            padding: 8px !important;
+            height: auto !important;
+        }
+
+        /* Stack columns vertically */
+        [data-testid="stHorizontalBlock"] {
+            flex-direction: column !important;
+            height: auto !important;
+            gap: 16px !important;
+        }
+
+        .stColumn {
+            width: 100% !important;
+            height: auto !important;
+        }
+
+        /* Fix container heights for mobile */
+        [data-testid="stVerticalBlockBorderWrapper"],
+        [data-testid="stVerticalBlockBorderWrapper"] > div,
+        [data-testid="stVerticalBlockBorderWrapper"] > div[style*="height"] {
+            height: auto !important;
+            max-height: none !important;
+            min-height: auto !important;
+        }
+
+        /* Mobile mascot section - stack vertically and center */
+        .stColumn:first-child [data-testid="stHorizontalBlock"] {
+            flex-direction: column !important;
+            align-items: center !important;
+        }
+
+        /* Smaller mascot image on mobile */
+        .stColumn:first-child [data-testid="stImage"] {
+            max-width: 180px !important;
+            margin: 0 auto !important;
+        }
+
+        .stColumn:first-child [data-testid="stImage"] img {
+            max-width: 180px !important;
+        }
+
+        /* Center brand header on mobile */
+        .brand-header {
+            text-align: center !important;
+            padding: 10px 0 !important;
+        }
+
+        .brand-title {
+            font-size: 1.4rem !important;
+        }
+
+        .brand-subtitle {
+            font-size: 0.8rem !important;
+        }
+
+        /* Input panel adjustments */
+        .input-panel {
+            padding: 12px !important;
+            margin-bottom: 12px !important;
+        }
+
+        .input-panel-title {
+            font-size: 1.1rem !important;
+        }
+
+        /* Larger touch targets for buttons */
+        .stButton > button {
+            padding: 10px 16px !important;
+            font-size: 0.85rem !important;
+            min-height: 44px !important;
+            border-radius: 12px !important;
+        }
+
+        .stFormSubmitButton > button {
+            padding: 12px 20px !important;
+            font-size: 1rem !important;
+            min-height: 48px !important;
+        }
+
+        /* Text input - larger for touch */
+        .stTextInput > div > div > input {
+            padding: 12px 14px !important;
+            font-size: 16px !important; /* Prevents iOS zoom */
+            min-height: 48px !important;
+        }
+
+        /* Quick questions - 2 columns on mobile */
+        .stColumn:first-child [data-testid="stHorizontalBlock"]:not(:first-child) {
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+        }
+
+        /* Response container */
+        .response-container {
+            margin: 0 !important;
+            border-radius: 12px !important;
+        }
+
+        .question-display {
+            padding: 12px !important;
+        }
+
+        .question-text {
+            font-size: 1rem !important;
+        }
+
+        .response-header {
+            padding: 10px 12px !important;
+        }
+
+        .response-body {
+            padding: 14px !important;
+        }
+
+        .response-body p {
+            font-size: 0.95rem !important;
+            line-height: 1.6 !important;
+        }
+
+        /* Welcome box */
+        .welcome-box {
+            padding: 20px 16px !important;
+        }
+
+        .welcome-title {
+            font-size: 1.2rem !important;
+        }
+
+        .welcome-text {
+            font-size: 0.9rem !important;
+        }
+
+        /* Follow-up buttons - larger touch targets */
+        .stColumn:last-child .stButton > button {
+            padding: 12px 16px !important;
+            font-size: 0.9rem !important;
+            min-height: 48px !important;
+        }
+
+        .followup-section {
+            padding: 12px !important;
+            margin-top: 12px !important;
+        }
+
+        .followup-title {
+            font-size: 0.85rem !important;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 16px !important;
+            padding: 12px !important;
+        }
+
+        .footer-text {
+            font-size: 0.75rem !important;
+        }
+    }
+
+    /* Extra small screens (phones in portrait) */
+    @media screen and (max-width: 480px) {
+        .main .block-container {
+            padding: 6px !important;
+        }
+
+        .brand-title {
+            font-size: 1.2rem !important;
+        }
+
+        .stColumn:first-child [data-testid="stImage"] img {
+            max-width: 140px !important;
+        }
+
+        .input-panel-title {
+            font-size: 1rem !important;
+        }
+
+        /* Single column for quick questions on very small screens */
+        .stColumn:first-child [data-testid="stHorizontalBlock"]:not(:first-child) .stColumn {
+            flex: 0 0 50% !important;
+            max-width: 50% !important;
+        }
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -679,7 +898,7 @@ left_panel, right_panel = st.columns([1, 1.2])
 # LEFT PANEL: INPUT (Full height, scrollable)
 # ============================================================
 with left_panel:
-    with st.container(height=800, border=False):
+    with st.container(border=False):
         # Mascot image and branding - side by side
         img_col, text_col = st.columns([1, 1])
         with img_col:
@@ -720,14 +939,22 @@ with left_panel:
         ]
 
         for i, (emoji, animal) in enumerate(quick_questions[:3]):
-            if q_row1[i].button(f"{emoji} {animal}", key=f"quick_{i}", use_container_width=True):
-                st.session_state.pending_question = f"Tell me about {animal.lower()}!"
-                st.rerun()
+            q_row1[i].button(
+                f"{emoji} {animal}",
+                key=f"quick_{i}",
+                use_container_width=True,
+                on_click=set_pending_question,
+                args=(f"Tell me about {animal.lower()}!",)
+            )
 
         for i, (emoji, animal) in enumerate(quick_questions[3:]):
-            if q_row2[i].button(f"{emoji} {animal}", key=f"quick_{i+3}", use_container_width=True):
-                st.session_state.pending_question = f"Tell me about {animal.lower()}!"
-                st.rerun()
+            q_row2[i].button(
+                f"{emoji} {animal}",
+                key=f"quick_{i+3}",
+                use_container_width=True,
+                on_click=set_pending_question,
+                args=(f"Tell me about {animal.lower()}!",)
+            )
 
         # Footer in left panel
         st.markdown("""
@@ -748,7 +975,7 @@ if "pending_question" in st.session_state:
 # RIGHT PANEL: RESPONSE (Full height, scrollable)
 # ============================================================
 with right_panel:
-    response_container = st.container(height=800, border=False)
+    response_container = st.container(border=False)
 
 with response_container:
     if submit_button and user_question:
@@ -806,9 +1033,13 @@ with response_container:
             </div>
             """, unsafe_allow_html=True)
             for i, question in enumerate(followups):
-                if st.button(f"❓ {question}", key=f"followup_{i}", use_container_width=True):
-                    st.session_state.pending_question = question
-                    st.rerun()
+                st.button(
+                    f"❓ {question}",
+                    key=f"followup_{i}",
+                    use_container_width=True,
+                    on_click=set_pending_question,
+                    args=(question,)
+                )
 
     # Show previous response on page refresh
     elif st.session_state.last_question and st.session_state.last_response:
@@ -843,9 +1074,13 @@ with response_container:
             </div>
             """, unsafe_allow_html=True)
             for i, question in enumerate(followups):
-                if st.button(f"❓ {question}", key=f"followup_prev_{i}", use_container_width=True):
-                    st.session_state.pending_question = question
-                    st.rerun()
+                st.button(
+                    f"❓ {question}",
+                    key=f"followup_prev_{i}",
+                    use_container_width=True,
+                    on_click=set_pending_question,
+                    args=(question,)
+                )
 
     # Welcome message when no question asked yet
     else:
