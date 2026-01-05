@@ -12,6 +12,7 @@ Features:
 
 import streamlit as st
 import lancedb
+import io
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -103,6 +104,47 @@ def extract_followup_questions(response: str) -> tuple[str, list[str]]:
 
 
 # ============================================================
+# VOICE FUNCTIONS (Chained Architecture: STT → LLM → TTS)
+# ============================================================
+
+def transcribe_audio(audio_bytes: bytes) -> str:
+    """
+    Convert audio to text using OpenAI's Whisper API.
+    Part of the chained voice architecture: Audio → Text
+    """
+    audio_file = io.BytesIO(audio_bytes)
+    audio_file.name = "recording.wav"
+
+    transcription = client.audio.transcriptions.create(
+        model="whisper-1",
+        file=audio_file,
+        language="en",
+    )
+    return transcription.text
+
+
+def generate_speech(text: str, voice: str = "nova") -> bytes:
+    """
+    Convert text to speech using OpenAI's TTS API.
+    Part of the chained voice architecture: Text → Audio
+
+    Voice options: alloy, echo, fable, onyx, nova, shimmer
+    'nova' is friendly and warm - good for kids!
+    """
+    # Clean text for TTS (remove markdown formatting)
+    clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # Remove bold
+    clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)  # Remove italic
+    clean_text = re.sub(r'#{1,6}\s*', '', clean_text)  # Remove headers
+
+    with client.audio.speech.with_streaming_response.create(
+        model="tts-1",
+        voice=voice,
+        input=clean_text[:4096],  # TTS limit is 4096 chars
+    ) as response:
+        return response.read()
+
+
+# ============================================================
 # DATABASE FUNCTIONS
 # ============================================================
 
@@ -112,7 +154,7 @@ def init_db():
     try:
         db = lancedb.connect(DB_PATH)
         return db.open_table(TABLE_NAME)
-    except Exception as e:
+    except Exception:
         return None
 
 
@@ -879,6 +921,11 @@ if "last_question" not in st.session_state:
     st.session_state.last_question = None
 if "followup_questions" not in st.session_state:
     st.session_state.followup_questions = []
+# Voice mode state
+if "voice_mode" not in st.session_state:
+    st.session_state.voice_mode = False
+if "last_audio_response" not in st.session_state:
+    st.session_state.last_audio_response = None
 
 # Initialize database
 table = init_db()
@@ -914,18 +961,44 @@ with left_panel:
         st.markdown("""
         <div class="input-panel">
             <h2 class="input-panel-title">🔍 Ask Me About Animals!</h2>
-            <p class="input-panel-subtitle">Type your question or try a quick question</p>
+            <p class="input-panel-subtitle">Type your question or use your voice!</p>
         </div>
         """, unsafe_allow_html=True)
 
-        # Question form
-        with st.form(key="question_form", clear_on_submit=True):
-            user_question = st.text_input(
-                "Your question:",
-                placeholder="What do lemurs eat? How fast can a cheetah run? 🦁🐼🦘",
-                label_visibility="collapsed"
-            )
-            submit_button = st.form_submit_button("🐘 Ask Zoocari!", use_container_width=True)
+        # Voice mode toggle
+        input_mode_col, toggle_col = st.columns([3, 1])
+        with toggle_col:
+            voice_mode = st.toggle("🎤", value=st.session_state.voice_mode, help="Toggle voice input")
+            st.session_state.voice_mode = voice_mode
+
+        # Initialize variables
+        user_question = None
+        submit_button = False
+
+        if st.session_state.voice_mode:
+            # Voice input mode
+            audio_input = st.audio_input("🎤 Record your question:", key="voice_recorder")
+
+            if audio_input is not None:
+                with st.spinner("🎧 Listening..."):
+                    try:
+                        # st.audio_input returns UploadedFile - use getvalue() for bytes
+                        audio_bytes = audio_input.getvalue()
+                        user_question = transcribe_audio(audio_bytes)
+                        if user_question:
+                            st.success(f"🗣️ You said: *{user_question}*")
+                            submit_button = True
+                    except Exception as e:
+                        st.error(f"Could not transcribe audio: {e}")
+        else:
+            # Text input mode (original form)
+            with st.form(key="question_form", clear_on_submit=True):
+                user_question = st.text_input(
+                    "Your question:",
+                    placeholder="What do lemurs eat? How fast can a cheetah run? 🦁🐼🦘",
+                    label_visibility="collapsed"
+                )
+                submit_button = st.form_submit_button("🐘 Ask Zoocari!", use_container_width=True)
 
         # Quick question buttons
         st.markdown('<p style="color: #3d332a; margin: 6px 0 4px 0; font-size: 0.7rem; font-weight: 600;">⚡ Quick:</p>', unsafe_allow_html=True)
@@ -1025,6 +1098,15 @@ with response_container:
         st.session_state.messages.append({"role": "assistant", "content": response})
         st.session_state.last_response = response
 
+        # Generate and play TTS audio response
+        with st.spinner("🔊 Generating voice response..."):
+            try:
+                audio_bytes = generate_speech(main_response)
+                st.session_state.last_audio_response = audio_bytes
+                st.audio(audio_bytes, format="audio/mp3", autoplay=st.session_state.voice_mode)
+            except Exception:
+                st.warning("Could not generate audio response.")
+
         # Display follow-up buttons
         if followups:
             st.markdown("""
@@ -1064,6 +1146,10 @@ with response_container:
         st.markdown('<div class="response-body">', unsafe_allow_html=True)
         st.markdown(main_response)
         st.markdown('</div></div>', unsafe_allow_html=True)
+
+        # Show audio player for previous response if available
+        if st.session_state.last_audio_response:
+            st.audio(st.session_state.last_audio_response, format="audio/mp3")
 
         # Display follow-up buttons from session state
         followups = st.session_state.get("followup_questions", [])
