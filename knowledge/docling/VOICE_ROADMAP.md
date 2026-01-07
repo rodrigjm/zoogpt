@@ -1,18 +1,31 @@
 # Voice Feature Project Plan: Zoocari Voice Mode
 
-## Architecture Overview: OpenAI Chained Voice Pipeline
+## Current Status: Phase 4 Up Next
+
+| Phase | Status | Description |
+|-------|--------|-------------|
+| Phase 1 | ✅ Complete | Audio Input Integration |
+| Phase 2 | ✅ Complete | Text-to-Speech Output (ElevenLabs) |
+| Phase 3 | ✅ Complete | UI/UX Enhancements |
+| Phase 4 | 🟡 Up Next | Integration & Polish |
+| Phase 5 | ⏳ Pending | HTTPS Deployment (Mobile Support) |
+
+---
+
+## Architecture Overview: Chained Voice Pipeline
 
 ```
-User Audio → [gpt-4o-transcribe] → Text → [gpt-4o-mini] → Response Text → [gpt-4o-mini-tts] → Audio Output
-     ↓              ↓                         ↓                    ↓
-   st.audio_input   STT API           Existing chat logic      TTS API + st.audio
+User Audio → [Whisper STT] → Text → [GPT-4o-mini] → Response → [ElevenLabs TTS] → Audio
+     ↓            ↓                      ↓                          ↓
+st.audio_input  OpenAI API      Existing chat logic         ElevenLabs API
+                                                            (OpenAI fallback)
 ```
 
-The chained architecture is recommended because:
+**Why chained architecture:**
 - High control and transparency (full transcript available)
 - Robust function calling support
 - Reliable, predictable responses
-- Ideal for structured workflows like your kid-friendly Q&A
+- Ideal for structured workflows like kid-friendly Q&A
 
 ---
 
@@ -20,120 +33,187 @@ The chained architecture is recommended because:
 
 ---
 
-### Phase 1: Audio Input Integration
+### Phase 1: Audio Input Integration ✅ COMPLETE
 **Goal**: Enable voice recording from the user
 
-| Task | Description | Files Affected |
-|------|-------------|----------------|
-| 1.1 | Add `st.audio_input` widget for voice recording | `zoo_chat.py` |
-| 1.2 | Create audio-to-text transcription function using `gpt-4o-transcribe` or `whisper-1` | `zoo_chat.py` (new function) |
-| 1.3 | Add voice mode toggle (button vs voice) in left panel | `zoo_chat.py` |
-| 1.4 | Handle audio file format conversion if needed | `zoo_chat.py` |
-| 1.5 | Update session state for voice input mode | `zoo_chat.py` |
+| Task | Status | Description |
+|------|--------|-------------|
+| 1.1 | ✅ | Add `st.audio_input` widget for voice recording |
+| 1.2 | ✅ | Create `transcribe_audio()` function using Whisper |
+| 1.3 | ✅ | Add voice mode toggle in left panel |
+| 1.4 | ✅ | Handle audio file format (wav via BytesIO) |
+| 1.5 | ✅ | Update session state for voice input mode |
 
-**New Dependencies**: None (OpenAI client already present)
-
-**Key Code Addition**:
+**Implementation**:
 ```python
-# New function for STT
 def transcribe_audio(audio_bytes: bytes) -> str:
-    """Convert audio to text using OpenAI's transcription API."""
+    """Convert audio to text using OpenAI's Whisper API."""
     audio_file = io.BytesIO(audio_bytes)
-    audio_file.name = "audio.wav"
+    audio_file.name = "recording.wav"
     transcription = client.audio.transcriptions.create(
-        model="whisper-1",  # or gpt-4o-transcribe
+        model="whisper-1",
         file=audio_file,
+        language="en",
     )
     return transcription.text
 ```
 
 ---
 
-### Phase 2: Text-to-Speech Output
+### Phase 2: Text-to-Speech Output ✅ COMPLETE
 **Goal**: Generate audio responses alongside text streaming
 
-| Task | Description | Files Affected |
-|------|-------------|----------------|
-| 2.1 | Create TTS function using `gpt-4o-mini-tts` | `zoo_chat.py` (new function) |
-| 2.2 | Generate audio after text response completes | `zoo_chat.py` |
-| 2.3 | Display audio player using `st.audio()` | `zoo_chat.py` |
-| 2.4 | Add voice selection option (alloy, nova, etc.) | `zoo_chat.py` |
-| 2.5 | Store audio in session state for replay | `zoo_chat.py` |
+| Task | Status | Description |
+|------|--------|-------------|
+| 2.1 | ✅ | Create `generate_speech()` with ElevenLabs API |
+| 2.2 | ✅ | Generate audio after text response completes |
+| 2.3 | ✅ | Display audio player using `st.audio()` |
+| 2.4 | ✅ | ElevenLabs voices (Rachel default) with OpenAI fallback |
+| 2.5 | ✅ | Store audio in session state for replay |
 
-**Key Code Addition**:
+**Implementation** (ElevenLabs with OpenAI fallback):
 ```python
-# New function for TTS
-def generate_speech(text: str, voice: str = "nova") -> bytes:
-    """Convert text to speech using OpenAI's TTS API."""
-    with client.audio.speech.with_streaming_response.create(
-        model="tts-1",
-        voice=voice,
-        input=text,
-    ) as response:
+def generate_speech(text: str, voice_id: str = "21m00Tcm4TlvDq8ikWAM") -> bytes:
+    """Convert text to speech using ElevenLabs (with OpenAI fallback)."""
+    clean_text = # ... remove markdown ...
+
+    if elevenlabs_client:
+        audio = elevenlabs_client.text_to_speech.convert(
+            voice_id=voice_id,
+            text=clean_text[:5000],
+            model_id="eleven_multilingual_v2",
+            output_format="mp3_44100_128"
+        )
+        return b"".join(audio)
+
+    # Fallback to OpenAI TTS
+    with client.audio.speech.with_streaming_response.create(...) as response:
         return response.read()
 ```
 
+**ElevenLabs Voice Options**:
+| Voice | ID | Description |
+|-------|-----|-------------|
+| Rachel | `21m00Tcm4TlvDq8ikWAM` | Warm, friendly (default) |
+| Bella | `EXAVITQu4vr4xnSDxMaL` | Young, energetic |
+| Josh | `TxGEqnHWrfWFTfGW9XjX` | Friendly male |
+
 ---
 
-### Phase 3: UI/UX Enhancements
+### Phase 3: UI/UX Enhancements ✅ COMPLETE
 **Goal**: Seamless voice interaction experience
 
-| Task | Description | Files Affected |
-|------|-------------|----------------|
-| 3.1 | Add voice mode toggle button (microphone icon) | `zoo_chat.py` |
-| 3.2 | Add visual recording indicator | `zoo_chat.py` (CSS) |
-| 3.3 | Style audio player to match Leesburg branding | `zoo_chat.py` (CSS) |
-| 3.4 | Add "Listen to Answer" button | `zoo_chat.py` |
-| 3.5 | Mobile-responsive voice controls | `zoo_chat.py` (CSS) |
-| 3.6 | Auto-play option for TTS response | `zoo_chat.py` |
+| Task | Status | Description |
+|------|--------|-------------|
+| 3.1 | ✅ | Voice mode toggle button |
+| 3.2 | ✅ | Visual recording indicator (pulse animation) |
+| 3.3 | ✅ | Style audio player to match Leesburg branding |
+| 3.4 | ✅ | Call-to-action voice button design |
+| 3.5 | ❌ | Mobile voice recording (requires HTTPS) |
+| 3.6 | ✅ | Auto-play TTS in voice mode |
+
+**Blocker**: Mobile voice recording requires HTTPS (see Phase 5)
+
+**Implementation Details**:
+- Pulse animation on recording indicator with orange glow effect
+- Voice mode status badge shows "Voice Active" / "Text Mode"
+- Styled audio player with Leesburg brown/yellow gradient
+- Voice panel with clear CTA and recording hints
 
 ---
 
-### Phase 4: Integration & Polish
+### Phase 4: Integration & Polish ⏳ PENDING
 **Goal**: Production-ready voice features
 
-| Task | Description | Files Affected |
-|------|-------------|----------------|
-| 4.1 | Error handling for audio recording failures | `zoo_chat.py` |
-| 4.2 | Loading states during transcription/TTS | `zoo_chat.py` |
-| 4.3 | Fallback to text when voice unavailable | `zoo_chat.py` |
-| 4.4 | Add voice-friendly response formatting | `zoo_chat.py` |
-| 4.5 | Test with kid-appropriate voice selection | `zoo_chat.py` |
-| 4.6 | Update requirements.txt if needed | `requirements.txt` |
+| Task | Status | Description |
+|------|--------|-------------|
+| 4.1 | ⏳ | Error handling for audio recording failures |
+| 4.2 | ⏳ | Loading states during transcription/TTS |
+| 4.3 | ✅ | Fallback to text when voice unavailable |
+| 4.4 | ⏳ | Voice-friendly response formatting |
+| 4.5 | ⏳ | Voice selection UI for users |
+| 4.6 | ✅ | Update requirements.txt (elevenlabs added) |
+
+---
+
+### Phase 5: HTTPS Deployment ⏳ PENDING (NEW)
+**Goal**: Enable mobile voice recording via secure context
+
+| Task | Status | Description |
+|------|--------|-------------|
+| 5.1 | ⏳ | Choose deployment method |
+| 5.2 | ⏳ | Configure HTTPS/SSL |
+| 5.3 | ⏳ | Test mobile voice recording |
+| 5.4 | ⏳ | Production deployment |
+
+**Deployment Options**:
+
+| Option | Complexity | Cost | Best For |
+|--------|------------|------|----------|
+| **Streamlit Cloud** | Easy | Free | Quick deployment |
+| **Cloudflare Tunnel** | Easy | Free | Self-hosted, no ports |
+| **ngrok** | Easy | Free/Paid | Testing only |
+| **Nginx + Let's Encrypt** | Medium | Free | Production self-hosted |
+| **Cloud Provider** | Medium | Varies | Scalable production |
+
+**Docker + Nginx Setup** (for self-hosted):
+```yaml
+# docker-compose.yml additions
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./certs:/etc/letsencrypt
+    depends_on:
+      - zoocari
+```
 
 ---
 
 ## File Changes Summary
 
-| File | Changes |
-|------|---------|
-| `zoo_chat.py` | +2 new functions (STT, TTS), UI updates for voice mode toggle, audio widgets, session state |
-| `requirements.txt` | Verify OpenAI version supports audio APIs (should be fine with current setup) |
+| File | Changes | Status |
+|------|---------|--------|
+| `zoo_chat.py` | STT function, TTS function (ElevenLabs), voice mode UI | ✅ Done |
+| `requirements.txt` | Added `elevenlabs` package | ✅ Done |
+| `.env` | `ELEVENLABS_API_KEY` (optional) | ✅ Documented |
+| `docker-compose.yml` | HTTPS proxy (Phase 5) | ⏳ Pending |
+| `nginx.conf` | SSL configuration (Phase 5) | ⏳ Pending |
 
 ---
 
-## Key Integration Points in Existing Code
+## Technical Decisions Made
 
-1. **Line 77-79** (`set_pending_question`): Extend to handle voice input
-2. **Line 147-160** (`get_chat_response`): Add TTS generation after response
-3. **Line 922-928** (question form): Add voice input alternative
-4. **Line 1009-1019** (response display): Add audio player for TTS output
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| STT Model | `whisper-1` | Stable, reliable for kids' speech |
+| TTS Provider | ElevenLabs (primary) | More natural, expressive voices |
+| TTS Fallback | OpenAI `tts-1` | Works without ElevenLabs key |
+| Default Voice | Rachel | Warm, friendly for kids |
+| Auto-play | Yes (voice mode only) | Natural conversation flow |
 
 ---
 
-## Technical Decisions Required
+## Environment Variables
 
-1. **STT Model**: `whisper-1` (stable) vs `gpt-4o-transcribe` (newer)?
-2. **TTS Model**: `tts-1` (faster) vs `tts-1-hd` (higher quality)?
-3. **Voice**: Which voice for Zoocari? (`nova` is friendly, `alloy` is neutral)
-4. **Auto-play**: Should TTS auto-play, or require button click?
-5. **Voice-only mode**: Separate mode, or alongside text input?
+```bash
+# Required
+OPENAI_API_KEY=sk-...
+
+# Optional (enables ElevenLabs TTS)
+ELEVENLABS_API_KEY=...
+```
 
 ---
 
 ## References
 
-- [OpenAI Voice Agents Guide](https://platform.openai.com/docs/guides/voice-agents)
-- [OpenAI Audio API](https://platform.openai.com/docs/guides/audio)
-- [OpenAI Text-to-Speech](https://platform.openai.com/docs/guides/text-to-speech)
+- [ElevenLabs Python SDK](https://github.com/elevenlabs/elevenlabs-python)
+- [ElevenLabs Voice Library](https://elevenlabs.io/voice-library)
+- [OpenAI Whisper API](https://platform.openai.com/docs/guides/speech-to-text)
+- [OpenAI TTS API](https://platform.openai.com/docs/guides/text-to-speech)
 - [Streamlit st.audio_input](https://docs.streamlit.io/develop/api-reference/widgets/st.audio_input)
+- [MediaRecorder HTTPS Requirement](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#privacy_and_security)

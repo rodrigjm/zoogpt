@@ -13,7 +13,9 @@ Features:
 import streamlit as st
 import lancedb
 import io
+import os
 from openai import OpenAI
+from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -21,6 +23,11 @@ load_dotenv()
 
 # Initialize OpenAI client
 client = OpenAI()
+
+# Initialize ElevenLabs client (optional - only if API key is set)
+elevenlabs_client = None
+if os.getenv("ELEVENLABS_API_KEY"):
+    elevenlabs_client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
 
 # Database settings
 DB_PATH = "data/zoo_lancedb"
@@ -44,7 +51,7 @@ ZUCARI_SYSTEM_PROMPT = """You are Zoocari the Elephant, the friendly animal expe
 1. ONLY answer questions using information from the CONTEXT provided below
 2. If the context doesn't contain information to answer the question, say: "Hmm, I don't know about that yet! Maybe ask one of the zookeepers when you visit Leesburg Animal Park, or check out a book from your library! 📚"
 3. NEVER make up facts or guess - kids trust you!
-4. Keep answers short (4-6 short paragraphs max)
+4. Keep answers short (2-3 short paragraphs max)
 5. Use age-appropriate language - no complex scientific terms without explanation
 6. Handle nature's realities gently (predators hunt, but no graphic details)
 7. Include 2 or 3 fun facts/statistics to make learning fun
@@ -123,23 +130,40 @@ def transcribe_audio(audio_bytes: bytes) -> str:
     return transcription.text
 
 
-def generate_speech(text: str, voice: str = "nova") -> bytes:
+def generate_speech(text: str, voice_id: str = "iEbJsqzb6jw8MYxZ2xca") -> bytes:
     """
-    Convert text to speech using OpenAI's TTS API.
+    Convert text to speech using ElevenLabs API (with OpenAI fallback).
     Part of the chained voice architecture: Text → Audio
 
-    Voice options: alloy, echo, fable, onyx, nova, shimmer
-    'nova' is friendly and warm - good for kids!
+    ElevenLabs Voice IDs (kid-friendly):
+    - "iEbJsqzb6jw8MYxZ2xca" - Custom voice (default)
+    - "21m00Tcm4TlvDq8ikWAM" - Rachel (warm, friendly female)
+    - "EXAVITQu4vr4xnSDxMaL" - Bella (young, energetic female)
+    - "TxGEqnHWrfWFTfGW9XjX" - Josh (friendly male narrator)
+
+    Falls back to OpenAI TTS if ElevenLabs is not configured.
     """
     # Clean text for TTS (remove markdown formatting)
     clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # Remove bold
     clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)  # Remove italic
     clean_text = re.sub(r'#{1,6}\s*', '', clean_text)  # Remove headers
 
+    # Use ElevenLabs if available
+    if elevenlabs_client:
+        audio = elevenlabs_client.text_to_speech.convert(
+            voice_id=voice_id,
+            text=clean_text[:5000],  # ElevenLabs limit
+            model_id="eleven_multilingual_v2",
+            output_format="mp3_44100_128"
+        )
+        # Convert generator to bytes
+        return b"".join(audio)
+
+    # Fallback to OpenAI TTS
     with client.audio.speech.with_streaming_response.create(
         model="tts-1",
-        voice=voice,
-        input=clean_text[:4096],  # TTS limit is 4096 chars
+        voice="nova",
+        input=clean_text[:4096],  # OpenAI TTS limit
     ) as response:
         return response.read()
 
@@ -906,6 +930,191 @@ st.markdown("""
         }
     }
 
+    /* ============================================
+       VOICE MODE - PULSE ANIMATION & STYLING
+       ============================================ */
+
+    /* Pulse animation keyframes */
+    @keyframes pulse-recording {
+        0% {
+            box-shadow: 0 0 0 0 rgba(242, 144, 33, 0.7);
+        }
+        70% {
+            box-shadow: 0 0 0 15px rgba(242, 144, 33, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(242, 144, 33, 0);
+        }
+    }
+
+    @keyframes pulse-glow {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.6;
+        }
+    }
+
+    /* Voice recording container with pulse effect */
+    .voice-recording-active {
+        background: linear-gradient(135deg, var(--leesburg-orange) 0%, #e07800 100%);
+        border-radius: 16px;
+        padding: 16px;
+        margin: 8px 0;
+        animation: pulse-recording 1.5s infinite;
+        border: 3px solid var(--leesburg-yellow);
+    }
+
+    .voice-recording-active .recording-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .recording-dot {
+        width: 12px;
+        height: 12px;
+        background-color: #ff4444;
+        border-radius: 50%;
+        animation: pulse-glow 1s infinite;
+    }
+
+    .recording-text {
+        font-family: 'Rubik', sans-serif;
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: var(--leesburg-white);
+        margin: 0;
+    }
+
+    /* Voice mode toggle button - CTA style */
+    .voice-cta-button {
+        background: linear-gradient(135deg, var(--leesburg-orange) 0%, #e07800 100%) !important;
+        color: var(--leesburg-white) !important;
+        border: 3px solid var(--leesburg-yellow) !important;
+        border-radius: 50px !important;
+        padding: 12px 24px !important;
+        font-family: 'Rubik', sans-serif !important;
+        font-weight: 700 !important;
+        font-size: 1rem !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 15px rgba(242, 144, 33, 0.4) !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+    }
+
+    .voice-cta-button:hover {
+        transform: translateY(-2px) scale(1.02) !important;
+        box-shadow: 0 6px 20px rgba(242, 144, 33, 0.5) !important;
+    }
+
+    .voice-cta-active {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%) !important;
+        animation: pulse-recording 1.5s infinite !important;
+    }
+
+    /* Voice mode panel styling */
+    .voice-mode-panel {
+        background: linear-gradient(135deg, var(--leesburg-brown) 0%, #4a3f35 100%);
+        border-radius: 16px;
+        padding: 16px;
+        margin: 8px 0;
+        border: 2px solid var(--leesburg-orange);
+        text-align: center;
+    }
+
+    .voice-mode-title {
+        font-family: 'Rubik', sans-serif;
+        font-weight: 700;
+        font-size: 1rem;
+        color: var(--leesburg-orange);
+        margin: 0 0 8px 0;
+    }
+
+    .voice-mode-hint {
+        font-family: 'Poppins', sans-serif;
+        font-size: 0.8rem;
+        color: var(--leesburg-white);
+        opacity: 0.9;
+        margin: 0;
+    }
+
+    /* ============================================
+       AUDIO PLAYER - LEESBURG BRANDING
+       ============================================ */
+
+    /* Style the Streamlit audio player container */
+    .stAudio {
+        margin: 12px 0 !important;
+    }
+
+    .stAudio > div {
+        background: linear-gradient(135deg, var(--leesburg-brown) 0%, #4a3f35 100%) !important;
+        border-radius: 12px !important;
+        padding: 12px 16px !important;
+        border: 2px solid var(--leesburg-yellow) !important;
+        box-shadow: 0 4px 12px rgba(61, 51, 42, 0.15) !important;
+    }
+
+    /* Audio element styling */
+    .stAudio audio {
+        width: 100% !important;
+        height: 40px !important;
+        border-radius: 8px !important;
+    }
+
+    /* Custom audio player wrapper */
+    .audio-player-wrapper {
+        background: linear-gradient(135deg, var(--leesburg-brown) 0%, #4a3f35 100%);
+        border-radius: 12px;
+        padding: 12px 16px;
+        border: 2px solid var(--leesburg-yellow);
+        margin: 12px 0;
+        box-shadow: 0 4px 12px rgba(61, 51, 42, 0.15);
+    }
+
+    .audio-player-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+
+    .audio-player-icon {
+        font-size: 1.2rem;
+    }
+
+    .audio-player-label {
+        font-family: 'Rubik', sans-serif;
+        font-weight: 600;
+        font-size: 0.8rem;
+        color: var(--leesburg-yellow);
+        margin: 0;
+    }
+
+    /* Style audio input widget */
+    [data-testid="stAudioInput"] {
+        margin: 8px 0 !important;
+    }
+
+    [data-testid="stAudioInput"] > div {
+        background: linear-gradient(135deg, var(--leesburg-orange) 0%, #e07800 100%) !important;
+        border-radius: 12px !important;
+        padding: 8px 12px !important;
+        border: 2px solid var(--leesburg-yellow) !important;
+    }
+
+    [data-testid="stAudioInput"] button {
+        background-color: var(--leesburg-yellow) !important;
+        color: var(--leesburg-brown) !important;
+        border-radius: 50% !important;
+        border: none !important;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -965,31 +1174,80 @@ with left_panel:
         </div>
         """, unsafe_allow_html=True)
 
-        # Voice mode toggle
-        input_mode_col, toggle_col = st.columns([3, 1])
-        with toggle_col:
-            voice_mode = st.toggle("🎤", value=st.session_state.voice_mode, help="Toggle voice input")
+        # Voice mode toggle - prominent CTA button
+        voice_col1, voice_col2 = st.columns([2, 2])
+        with voice_col1:
+            voice_mode = st.toggle(
+                "🎤 Voice Mode",
+                value=st.session_state.voice_mode,
+                help="Toggle voice input - speak your questions!"
+            )
             st.session_state.voice_mode = voice_mode
+
+        with voice_col2:
+            if st.session_state.voice_mode:
+                st.markdown("""
+                <div style="background: linear-gradient(135deg, #f29021 0%, #e07800 100%);
+                            border-radius: 20px; padding: 6px 12px; text-align: center;
+                            border: 2px solid #f5d224;">
+                    <span style="color: white; font-weight: 600; font-size: 0.8rem;">
+                        🔴 Voice Active
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div style="background: #e0ded9; border-radius: 20px; padding: 6px 12px;
+                            text-align: center; opacity: 0.7;">
+                    <span style="color: #3d332a; font-weight: 500; font-size: 0.8rem;">
+                        📝 Text Mode
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
 
         # Initialize variables
         user_question = None
         submit_button = False
 
         if st.session_state.voice_mode:
-            # Voice input mode
-            audio_input = st.audio_input("🎤 Record your question:", key="voice_recorder")
+            # Voice input mode with enhanced UI
+            st.markdown("""
+            <div class="voice-mode-panel">
+                <p class="voice-mode-title">🎙️ Tap the microphone to record!</p>
+                <p class="voice-mode-hint">Speak clearly and I'll listen to your question</p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            audio_input = st.audio_input("Record your question:", key="voice_recorder", label_visibility="collapsed")
 
             if audio_input is not None:
-                with st.spinner("🎧 Listening..."):
-                    try:
-                        # st.audio_input returns UploadedFile - use getvalue() for bytes
-                        audio_bytes = audio_input.getvalue()
-                        user_question = transcribe_audio(audio_bytes)
-                        if user_question:
-                            st.success(f"🗣️ You said: *{user_question}*")
-                            submit_button = True
-                    except Exception as e:
-                        st.error(f"Could not transcribe audio: {e}")
+                # Show recording indicator with pulse animation
+                st.markdown("""
+                <div class="voice-recording-active">
+                    <div class="recording-indicator">
+                        <span class="recording-dot"></span>
+                        <p class="recording-text">🎧 Processing your voice...</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                try:
+                    # st.audio_input returns UploadedFile - use getvalue() for bytes
+                    audio_bytes = audio_input.getvalue()
+                    user_question = transcribe_audio(audio_bytes)
+                    if user_question:
+                        st.markdown(f"""
+                        <div style="background: linear-gradient(135deg, #76b9db 0%, #5a9fc4 100%);
+                                    border-radius: 12px; padding: 12px 16px; margin: 8px 0;
+                                    border: 2px solid #f5d224;">
+                            <p style="color: white; font-weight: 600; font-size: 0.9rem; margin: 0;">
+                                🗣️ You said: "{user_question}"
+                            </p>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        submit_button = True
+                except Exception as e:
+                    st.error(f"Could not transcribe audio: {e}")
         else:
             # Text input mode (original form)
             with st.form(key="question_form", clear_on_submit=True):
@@ -1098,12 +1356,22 @@ with response_container:
         st.session_state.messages.append({"role": "assistant", "content": response})
         st.session_state.last_response = response
 
-        # Generate and play TTS audio response
+        # Generate and play TTS audio response with styled player
         with st.spinner("🔊 Generating voice response..."):
             try:
                 audio_bytes = generate_speech(main_response)
                 st.session_state.last_audio_response = audio_bytes
-                st.audio(audio_bytes, format="audio/mp3", autoplay=st.session_state.voice_mode)
+
+                # Styled audio player header
+                st.markdown("""
+                <div class="audio-player-wrapper">
+                    <div class="audio-player-header">
+                        <span class="audio-player-icon">🔊</span>
+                        <p class="audio-player-label">Listen to Zoocari's Response</p>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
             except Exception:
                 st.warning("Could not generate audio response.")
 
@@ -1147,8 +1415,16 @@ with response_container:
         st.markdown(main_response)
         st.markdown('</div></div>', unsafe_allow_html=True)
 
-        # Show audio player for previous response if available
+        # Show styled audio player for previous response if available
         if st.session_state.last_audio_response:
+            st.markdown("""
+            <div class="audio-player-wrapper">
+                <div class="audio-player-header">
+                    <span class="audio-player-icon">🔊</span>
+                    <p class="audio-player-label">Listen to Zoocari's Response</p>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
             st.audio(st.session_state.last_audio_response, format="audio/mp3")
 
         # Display follow-up buttons from session state
