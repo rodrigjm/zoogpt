@@ -14,27 +14,52 @@ import streamlit as st
 import lancedb
 import io
 import os
+import time
 from openai import OpenAI
 from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
+
+# ============================================================
+# LOGGING UTILITIES
+# ============================================================
+
+def log(stage: str, message: str, level: str = "INFO"):
+    """Print timestamped log message to console."""
+    import sys
+    timestamp = time.strftime("%H:%M:%S")
+    emoji = {"INFO": "ℹ️", "SUCCESS": "✅", "WARNING": "⚠️", "ERROR": "❌", "TTS": "🔊", "STT": "🎤", "LLM": "🤖", "DB": "🗄️"}.get(level, "•")
+    print(f"[{timestamp}] {emoji} [{stage}] {message}", flush=True)
+    sys.stdout.flush()
 
 # Local TTS (Kokoro)
 try:
     from tts_kokoro import generate_speech_kokoro, is_kokoro_available, VOICE_PRESETS
     KOKORO_AVAILABLE = True
-except ImportError:
+    log("INIT", "Kokoro TTS module loaded successfully", "SUCCESS")
+except ImportError as e:
     KOKORO_AVAILABLE = False
+    log("INIT", f"Kokoro TTS not available: {e}", "WARNING")
 
 # Load environment variables
 load_dotenv()
 
+# Startup banner
+print("\n" + "="*60, flush=True)
+print("🐘 ZOOCARI - Zoo Q&A Chatbot", flush=True)
+print("="*60, flush=True)
+log("INIT", "Environment variables loaded", "INFO")
+
 # Initialize OpenAI client
 client = OpenAI()
+log("INIT", "OpenAI client initialized", "SUCCESS")
 
 # Initialize ElevenLabs client (optional - only if API key is set)
 elevenlabs_client = None
 if os.getenv("ELEVENLABS_API_KEY"):
     elevenlabs_client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
+    log("INIT", "ElevenLabs client initialized", "SUCCESS")
+else:
+    log("INIT", "ElevenLabs API key not found - cloud TTS fallback disabled", "WARNING")
 
 # Database settings
 DB_PATH = "data/zoo_lancedb"
@@ -58,7 +83,7 @@ ZUCARI_SYSTEM_PROMPT = """You are Zoocari the Elephant, the friendly animal expe
 1. ONLY answer questions using information from the CONTEXT provided below
 2. If the context doesn't contain information to answer the question, say: "Hmm, I don't know about that yet! Maybe ask one of the zookeepers when you visit Leesburg Animal Park, or check out a book from your library! 📚"
 3. NEVER make up facts or guess - kids trust you!
-4. Keep answers short (2-3 short paragraphs max)
+4. Keep answers short (1-2 short paragraphs max)
 5. Use age-appropriate language - no complex scientific terms without explanation
 6. Handle nature's realities gently (predators hunt, but no graphic details)
 7. Include 2 or 3 fun facts/statistics to make learning fun
@@ -126,6 +151,9 @@ def transcribe_audio(audio_bytes: bytes) -> str:
     Convert audio to text using OpenAI's Whisper API.
     Part of the chained voice architecture: Audio → Text
     """
+    log("STT", f"Received audio: {len(audio_bytes)} bytes", "STT")
+    start_time = time.time()
+
     audio_file = io.BytesIO(audio_bytes)
     audio_file.name = "recording.wav"
 
@@ -134,6 +162,9 @@ def transcribe_audio(audio_bytes: bytes) -> str:
         file=audio_file,
         language="en",
     )
+
+    elapsed = (time.time() - start_time) * 1000
+    log("STT", f"Transcription complete in {elapsed:.0f}ms: \"{transcription.text[:50]}...\"", "SUCCESS")
     return transcription.text
 
 
@@ -152,20 +183,33 @@ def generate_speech(text: str, voice: str = "af_bella") -> bytes:
 
     Falls back to cloud TTS if local inference fails.
     """
+    log("TTS", f"Starting TTS generation for {len(text)} chars, voice={voice}", "TTS")
+
     # Clean text for TTS (remove markdown formatting)
     clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # Remove bold
     clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)  # Remove italic
     clean_text = re.sub(r'#{1,6}\s*', '', clean_text)  # Remove headers
+    log("TTS", f"Cleaned text: {len(clean_text)} chars", "INFO")
 
     # 1. Try Kokoro (local) first - fastest option
     if KOKORO_AVAILABLE and is_kokoro_available():
+        log("TTS", "Attempting Kokoro (local) TTS...", "TTS")
+        start_time = time.time()
         try:
-            return generate_speech_kokoro(clean_text, voice=voice)
+            audio = generate_speech_kokoro(clean_text, voice=voice)
+            elapsed = (time.time() - start_time) * 1000
+            log("TTS", f"✅ KOKORO (local) succeeded in {elapsed:.0f}ms, {len(audio)} bytes", "SUCCESS")
+            return audio
         except Exception as e:
-            print(f"Kokoro TTS failed, falling back to cloud: {e}")
+            elapsed = (time.time() - start_time) * 1000
+            log("TTS", f"Kokoro failed after {elapsed:.0f}ms: {e}", "WARNING")
+    else:
+        log("TTS", "Kokoro not available, skipping local TTS", "WARNING")
 
     # 2. Fallback to ElevenLabs (cloud)
     if elevenlabs_client:
+        log("TTS", "Attempting ElevenLabs (cloud) TTS...", "TTS")
+        start_time = time.time()
         try:
             # Map Kokoro voice to ElevenLabs voice ID
             elevenlabs_voice_map = {
@@ -174,6 +218,7 @@ def generate_speech(text: str, voice: str = "af_bella") -> bytes:
                 "am_adam": "TxGEqnHWrfWFTfGW9XjX",   # Josh
             }
             voice_id = elevenlabs_voice_map.get(voice, "iEbJsqzb6jw8MYxZ2xca")
+            log("TTS", f"Using ElevenLabs voice_id={voice_id}", "INFO")
 
             audio = elevenlabs_client.text_to_speech.convert(
                 voice_id=voice_id,
@@ -181,17 +226,28 @@ def generate_speech(text: str, voice: str = "af_bella") -> bytes:
                 model_id="eleven_multilingual_v2",
                 output_format="mp3_44100_128"
             )
-            return b"".join(audio)
+            audio_bytes = b"".join(audio)
+            elapsed = (time.time() - start_time) * 1000
+            log("TTS", f"✅ ELEVENLABS (cloud) succeeded in {elapsed:.0f}ms, {len(audio_bytes)} bytes", "SUCCESS")
+            return audio_bytes
         except Exception as e:
-            print(f"ElevenLabs TTS failed, falling back to OpenAI: {e}")
+            elapsed = (time.time() - start_time) * 1000
+            log("TTS", f"ElevenLabs failed after {elapsed:.0f}ms: {e}", "WARNING")
+    else:
+        log("TTS", "ElevenLabs client not configured, skipping", "WARNING")
 
     # 3. Final fallback to OpenAI TTS
+    log("TTS", "Attempting OpenAI (cloud) TTS as final fallback...", "TTS")
+    start_time = time.time()
     with client.audio.speech.with_streaming_response.create(
         model="tts-1",
         voice="nova",
         input=clean_text[:4096],  # OpenAI TTS limit
     ) as response:
-        return response.read()
+        audio_bytes = response.read()
+        elapsed = (time.time() - start_time) * 1000
+        log("TTS", f"✅ OPENAI (cloud) succeeded in {elapsed:.0f}ms, {len(audio_bytes)} bytes", "SUCCESS")
+        return audio_bytes
 
 
 # ============================================================
@@ -201,15 +257,22 @@ def generate_speech(text: str, voice: str = "af_bella") -> bytes:
 @st.cache_resource
 def init_db():
     """Initialize database connection."""
+    log("DB", f"Connecting to LanceDB at {DB_PATH}", "DB")
     try:
         db = lancedb.connect(DB_PATH)
-        return db.open_table(TABLE_NAME)
-    except Exception:
+        table = db.open_table(TABLE_NAME)
+        log("DB", f"Database connected, table '{TABLE_NAME}' loaded", "SUCCESS")
+        return table
+    except Exception as e:
+        log("DB", f"Database connection failed: {e}", "ERROR")
         return None
 
 
 def get_context(query: str, table, num_results: int = 5) -> tuple[str, list, float]:
     """Search the database for relevant context."""
+    log("DB", f"Searching for: \"{query[:50]}...\"", "DB")
+    start_time = time.time()
+
     results = table.search(query).limit(num_results).to_pandas()
 
     contexts = []
@@ -233,11 +296,18 @@ def get_context(query: str, table, num_results: int = 5) -> tuple[str, list, flo
     avg_distance = sum(distances) / len(distances) if distances else 1.0
     confidence = max(0, 1 - avg_distance)
 
+    elapsed = (time.time() - start_time) * 1000
+    animals_found = [s["animal"] for s in sources]
+    log("DB", f"Found {len(results)} results in {elapsed:.0f}ms: {animals_found}, confidence={confidence:.2f}", "SUCCESS")
+
     return "\n\n---\n\n".join(contexts), sources, confidence
 
 
 def get_chat_response(messages, context: str) -> str:
     """Get streaming response from OpenAI API with Zoocari persona."""
+    log("LLM", f"Generating response with gpt-4o-mini, context={len(context)} chars", "LLM")
+    start_time = time.time()
+
     system_prompt = ZUCARI_SYSTEM_PROMPT.format(context=context)
     messages_with_context = [{"role": "system", "content": system_prompt}, *messages]
 
@@ -249,6 +319,9 @@ def get_chat_response(messages, context: str) -> str:
     )
 
     response = st.write_stream(stream)
+
+    elapsed = (time.time() - start_time) * 1000
+    log("LLM", f"Response generated in {elapsed:.0f}ms, {len(response)} chars", "SUCCESS")
     return response
 
 

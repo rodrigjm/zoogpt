@@ -41,14 +41,20 @@ def get_kokoro_pipeline():
     global _pipeline, _pipeline_error
 
     if _pipeline_error:
+        print(f"[KOKORO] Pipeline previously failed: {_pipeline_error}", flush=True)
         return None
 
     if _pipeline is None:
         try:
+            print("[KOKORO] Initializing KPipeline (first load may take a few seconds)...", flush=True)
             from kokoro import KPipeline
             _pipeline = KPipeline(lang_code='a')  # American English
+            print("[KOKORO] Pipeline initialized successfully!", flush=True)
         except Exception as e:
             _pipeline_error = str(e)
+            print(f"[KOKORO] Pipeline initialization FAILED: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             return None
 
     return _pipeline
