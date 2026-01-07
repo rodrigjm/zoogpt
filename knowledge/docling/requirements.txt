@@ -9,3 +9,6 @@ streamlit
 tiktoken
 transformers
 elevenlabs
+# Kokoro TTS - Local inference
+kokoro>=0.9.4
+soundfile

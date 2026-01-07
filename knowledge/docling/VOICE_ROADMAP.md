@@ -1,13 +1,14 @@
 # Voice Feature Project Plan: Zoocari Voice Mode
 
-## Current Status: Phase 4 Up Next
+## Current Status: Kokoro Local TTS Integration
 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | Phase 1 | ✅ Complete | Audio Input Integration |
 | Phase 2 | ✅ Complete | Text-to-Speech Output (ElevenLabs) |
+| Phase 2.5 | 🟡 In Progress | **Kokoro Local TTS** (latency optimization) |
 | Phase 3 | ✅ Complete | UI/UX Enhancements |
-| Phase 4 | 🟡 Up Next | Integration & Polish |
+| Phase 4 | ⏳ Pending | Integration & Polish |
 | Phase 5 | ⏳ Pending | HTTPS Deployment (Mobile Support) |
 
 ---
@@ -15,10 +16,12 @@
 ## Architecture Overview: Chained Voice Pipeline
 
 ```
-User Audio → [Whisper STT] → Text → [GPT-4o-mini] → Response → [ElevenLabs TTS] → Audio
-     ↓            ↓                      ↓                          ↓
-st.audio_input  OpenAI API      Existing chat logic         ElevenLabs API
-                                                            (OpenAI fallback)
+User Audio → [Whisper STT] → Text → [GPT-4o-mini] → Response → [TTS] → Audio
+     ↓            ↓                      ↓                       ↓
+st.audio_input  OpenAI API      Existing chat logic      Tiered Fallback:
+                                                         1. Kokoro (local)
+                                                         2. ElevenLabs (cloud)
+                                                         3. OpenAI (cloud)
 ```
 
 **Why chained architecture:**
@@ -26,6 +29,49 @@ st.audio_input  OpenAI API      Existing chat logic         ElevenLabs API
 - Robust function calling support
 - Reliable, predictable responses
 - Ideal for structured workflows like kid-friendly Q&A
+
+---
+
+## Phase 2.5: Kokoro Local TTS 🟡 IN PROGRESS
+
+**Goal**: Replace cloud TTS with local inference for reduced latency
+
+### Latency Comparison
+| Provider | Latency | Cost | Network |
+|----------|---------|------|---------|
+| **Kokoro (local)** | 50-200ms | Free | No |
+| ElevenLabs | 500-2000ms | ~$0.30/1K chars | Yes |
+| OpenAI TTS | 300-800ms | ~$0.015/1K chars | Yes |
+
+### Implementation Tasks
+| Task | Status | Description |
+|------|--------|-------------|
+| 2.5.1 | ✅ | Add `kokoro`, `soundfile` to requirements.txt |
+| 2.5.2 | ✅ | Create `tts_kokoro.py` module |
+| 2.5.3 | ✅ | Implement tiered fallback in `generate_speech()` |
+| 2.5.4 | ⏳ | Install espeak-ng system dependency |
+| 2.5.5 | ⏳ | Test local inference |
+| 2.5.6 | ⏳ | Add voice selection UI |
+
+### Kokoro Voice Options (Kid-Friendly)
+| Voice | ID | Description |
+|-------|-----|-------------|
+| Bella | `af_bella` | Friendly female (default) |
+| Nova | `af_nova` | Warm, engaging female |
+| Heart | `af_heart` | Expressive, upbeat female |
+| Adam | `am_adam` | Clear male voice |
+
+### System Requirements
+```bash
+# macOS
+brew install espeak-ng
+
+# Ubuntu/Debian
+apt-get install espeak-ng
+```
+
+### New Files
+- `tts_kokoro.py` - Local Kokoro TTS inference module
 
 ---
 

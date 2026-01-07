@@ -18,6 +18,13 @@ from openai import OpenAI
 from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 
+# Local TTS (Kokoro)
+try:
+    from tts_kokoro import generate_speech_kokoro, is_kokoro_available, VOICE_PRESETS
+    KOKORO_AVAILABLE = True
+except ImportError:
+    KOKORO_AVAILABLE = False
+
 # Load environment variables
 load_dotenv()
 
@@ -130,36 +137,55 @@ def transcribe_audio(audio_bytes: bytes) -> str:
     return transcription.text
 
 
-def generate_speech(text: str, voice_id: str = "iEbJsqzb6jw8MYxZ2xca") -> bytes:
+def generate_speech(text: str, voice: str = "af_bella") -> bytes:
     """
-    Convert text to speech using ElevenLabs API (with OpenAI fallback).
-    Part of the chained voice architecture: Text → Audio
+    Convert text to speech with tiered fallback for optimal latency:
+    1. Kokoro (local) - fastest, free, ~50-200ms
+    2. ElevenLabs (cloud) - high quality, ~500-2000ms
+    3. OpenAI (cloud) - reliable fallback, ~300-800ms
 
-    ElevenLabs Voice IDs (kid-friendly):
-    - "iEbJsqzb6jw8MYxZ2xca" - Custom voice (default)
-    - "21m00Tcm4TlvDq8ikWAM" - Rachel (warm, friendly female)
-    - "EXAVITQu4vr4xnSDxMaL" - Bella (young, energetic female)
-    - "TxGEqnHWrfWFTfGW9XjX" - Josh (friendly male narrator)
+    Kokoro Voice Options (kid-friendly):
+    - "af_bella" - Friendly female, clear pronunciation (default)
+    - "af_nova" - Warm, engaging female
+    - "af_heart" - Expressive, upbeat female
+    - "am_adam" - Clear male voice
 
-    Falls back to OpenAI TTS if ElevenLabs is not configured.
+    Falls back to cloud TTS if local inference fails.
     """
     # Clean text for TTS (remove markdown formatting)
     clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # Remove bold
     clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)  # Remove italic
     clean_text = re.sub(r'#{1,6}\s*', '', clean_text)  # Remove headers
 
-    # Use ElevenLabs if available
-    if elevenlabs_client:
-        audio = elevenlabs_client.text_to_speech.convert(
-            voice_id=voice_id,
-            text=clean_text[:5000],  # ElevenLabs limit
-            model_id="eleven_multilingual_v2",
-            output_format="mp3_44100_128"
-        )
-        # Convert generator to bytes
-        return b"".join(audio)
+    # 1. Try Kokoro (local) first - fastest option
+    if KOKORO_AVAILABLE and is_kokoro_available():
+        try:
+            return generate_speech_kokoro(clean_text, voice=voice)
+        except Exception as e:
+            print(f"Kokoro TTS failed, falling back to cloud: {e}")
 
-    # Fallback to OpenAI TTS
+    # 2. Fallback to ElevenLabs (cloud)
+    if elevenlabs_client:
+        try:
+            # Map Kokoro voice to ElevenLabs voice ID
+            elevenlabs_voice_map = {
+                "af_bella": "EXAVITQu4vr4xnSDxMaL",  # Bella
+                "af_nova": "21m00Tcm4TlvDq8ikWAM",   # Rachel
+                "am_adam": "TxGEqnHWrfWFTfGW9XjX",   # Josh
+            }
+            voice_id = elevenlabs_voice_map.get(voice, "iEbJsqzb6jw8MYxZ2xca")
+
+            audio = elevenlabs_client.text_to_speech.convert(
+                voice_id=voice_id,
+                text=clean_text[:5000],  # ElevenLabs limit
+                model_id="eleven_multilingual_v2",
+                output_format="mp3_44100_128"
+            )
+            return b"".join(audio)
+        except Exception as e:
+            print(f"ElevenLabs TTS failed, falling back to OpenAI: {e}")
+
+    # 3. Final fallback to OpenAI TTS
     with client.audio.speech.with_streaming_response.create(
         model="tts-1",
         voice="nova",
