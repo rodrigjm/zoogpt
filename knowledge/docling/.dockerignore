@@ -1,23 +1,33 @@
-# Virtual environment
+# ============================================================
+# Docker Ignore - Zoocari with Kokoro TTS
+# ============================================================
+
+# Virtual environments
 .venv/
+.venv_*/
 venv/
 ENV/
+env/
 
 # Git
 .git/
 .gitignore
 
-# IDE
+# IDE and editor
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
+*~
 
 # Python cache
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.pytest_cache/
+.mypy_cache/
 
 # Environment files (passed via docker-compose)
 .env
@@ -27,13 +37,40 @@ __pycache__/
 # Data directory (mounted as volume)
 data/
 
+# Model cache (mounted as volume)
+.cache/
+
 # OS files
 .DS_Store
 Thumbs.db
+*.log
 
-# Documentation
+# Documentation (keep README)
 *.md
 !README.md
 
 # Jupyter
 .ipynb_checkpoints/
+*.ipynb
+
+# Test files
+test_*.py
+*_test.py
+tests/
+
+# Development scripts
+1-*.py
+2-*.py
+3-*.py
+4-*.py
+5-*.py
+
+# Large assets not needed in container
+*.jpg
+*.jpeg
+zoocari_mascot.png
+
+# Backup files
+*.bak
+*.backup
+*_backup*

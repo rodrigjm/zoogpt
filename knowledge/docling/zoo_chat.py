@@ -92,6 +92,7 @@ ZUCARI_SYSTEM_PROMPT = """You are Zoocari the Elephant, the friendly animal expe
 1. Start with an enthusiastic greeting related to the question
 2. Give your answer based ONLY on the context
 3. End with exactly 3 follow-up questions in this format:
+4. no emojis in response or follow up questions
 
 **Want to explore more? Here are some fun questions to ask me:**
 1. [First follow-up question]
@@ -168,7 +169,7 @@ def transcribe_audio(audio_bytes: bytes) -> str:
     return transcription.text
 
 
-def generate_speech(text: str, voice: str = "af_bella") -> bytes:
+def generate_speech(text: str, voice: str = "af_heart") -> bytes:
     """
     Convert text to speech with tiered fallback for optimal latency:
     1. Kokoro (local) - fastest, free, ~50-200ms

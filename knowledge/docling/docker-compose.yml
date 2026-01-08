@@ -1,15 +1,80 @@
+# ============================================================
+# Zoocari - Zoo Q&A Chatbot with Local Kokoro TTS
+# ============================================================
+#
+# Quick Start:
+#   docker compose up --build
+#
+# Environment Variables (set in .env or pass directly):
+#   - OPENAI_API_KEY (required): OpenAI API key for chat & STT
+#   - ELEVENLABS_API_KEY (optional): Fallback TTS provider
+#   - TTS_VOICE (optional): Kokoro voice ID (default: af_heart)
+#
+# ============================================================
+
 services:
   zoocari:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: zoocari-app
     ports:
       - "8501:8501"
+
     volumes:
       # Persist vector database between container restarts
       - ./data:/app/data
+
+      # Persist Hugging Face model cache (Kokoro, spaCy models)
+      # This prevents re-downloading models on container restart
+      - zoocari-hf-cache:/app/.cache/huggingface
+
+      # Persist PyTorch cache
+      - zoocari-torch-cache:/app/.cache/torch
+
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Required
+      - OPENAI_API_KEY=${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+
+      # Optional: ElevenLabs fallback TTS
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+
+      # TTS Configuration
+      - TTS_VOICE=${TTS_VOICE:-af_heart}
+      - TTS_PROVIDER=${TTS_PROVIDER:-kokoro}
+
+      # Python settings for unbuffered logging
+      - PYTHONUNBUFFERED=1
+
+      # Hugging Face cache location
+      - HF_HOME=/app/.cache/huggingface
+      - TORCH_HOME=/app/.cache/torch
+
     env_file:
       - path: .env
         required: false
+
+    # Restart policy
     restart: unless-stopped
+
+    # Resource limits (adjust based on your hardware)
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# Named volumes for persistent model cache
+volumes:
+  zoocari-hf-cache:
+    name: zoocari-hf-cache
+  zoocari-torch-cache:
+    name: zoocari-torch-cache
