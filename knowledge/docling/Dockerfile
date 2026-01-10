@@ -67,6 +67,7 @@ COPY zoo_sources.py .
 COPY zoocari_mascot_web.png .
 COPY entrypoint.sh .
 COPY utils/ ./utils/
+COPY static/ ./static/
 
 # Make entrypoint executable
 RUN chmod +x entrypoint.sh
