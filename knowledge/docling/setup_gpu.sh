@@ -80,6 +80,56 @@ if [[ "$OS" == "Linux" ]]; then
     echo "Platform: Linux"
     echo ""
 
+    # Check for AMD GPU first
+    if lspci 2>/dev/null | grep -i "vga\|3d" | grep -qi "amd\|ati\|radeon"; then
+        AMD_GPU=$(lspci 2>/dev/null | grep -i "vga\|3d" | grep -i "amd\|ati\|radeon" | head -1)
+        echo "AMD GPU detected: $AMD_GPU"
+        echo ""
+
+        # Check if it's a supported discrete GPU
+        if echo "$AMD_GPU" | grep -qiE "RX\s*(6[0-9]{3}|7[0-9]{3})|MI[0-9]+|Instinct"; then
+            echo "This is a ROCm-compatible discrete GPU."
+            echo ""
+            if command -v rocm-smi &> /dev/null; then
+                echo "ROCm Status: Installed"
+                rocm-smi --showproductname 2>/dev/null || true
+                echo ""
+                echo "To enable ROCm in Docker, add to docker-compose.yml:"
+                cat << 'EOF'
+    devices:
+      - /dev/kfd
+      - /dev/dri
+    group_add:
+      - video
+      - render
+EOF
+                echo ""
+            else
+                echo "ROCm Status: NOT INSTALLED"
+                echo "Install ROCm: https://rocm.docs.amd.com/en/latest/deploy/linux/quick_start.html"
+                echo ""
+            fi
+        else
+            echo "WARNING: Integrated/older AMD GPUs are NOT supported by ROCm."
+            echo "ROCm only supports: RX 6000/7000 series, MI/Instinct series"
+            echo ""
+            echo "Using cloud TTS (OpenAI) instead."
+        fi
+
+        # Default to cloud TTS for AMD (most aren't supported)
+        if [[ -f .env ]]; then
+            grep -v "^TTS_PROVIDER=" .env > .env.tmp || true
+            echo "TTS_PROVIDER=openai" >> .env.tmp
+            mv .env.tmp .env
+        else
+            echo "TTS_PROVIDER=openai" >> .env
+        fi
+        echo ""
+        echo "Configuration: TTS_PROVIDER=openai"
+        echo "Done. Run: docker-compose up --build"
+        exit 0
+    fi
+
     # Check for NVIDIA GPU
     if command -v nvidia-smi &> /dev/null; then
         echo "NVIDIA GPU detected:"
