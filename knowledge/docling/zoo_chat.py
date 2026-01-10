@@ -42,6 +42,18 @@ except ImportError as e:
     KOKORO_AVAILABLE = False
     log("INIT", f"Kokoro TTS not available: {e}", "WARNING")
 
+# Local STT (Faster-Whisper)
+try:
+    from faster_whisper import WhisperModel
+    FASTER_WHISPER_AVAILABLE = True
+    log("INIT", "Faster-Whisper module loaded successfully", "SUCCESS")
+except ImportError as e:
+    FASTER_WHISPER_AVAILABLE = False
+    log("INIT", f"Faster-Whisper not available: {e}", "WARNING")
+
+# Global STT model (lazy-loaded)
+_stt_model = None
+
 # Load environment variables
 load_dotenv()
 
@@ -149,14 +161,45 @@ def extract_followup_questions(response: str) -> tuple[str, list[str]]:
 # VOICE FUNCTIONS (Chained Architecture: STT → LLM → TTS)
 # ============================================================
 
-def transcribe_audio(audio_bytes: bytes) -> str:
-    """
-    Convert audio to text using OpenAI's Whisper API.
-    Part of the chained voice architecture: Audio → Text
-    """
-    log("STT", f"Received audio: {len(audio_bytes)} bytes", "STT")
-    start_time = time.time()
+def get_stt_model():
+    """Get or initialize the Faster-Whisper model (lazy-loaded)."""
+    global _stt_model
+    if _stt_model is None:
+        log("STT", "Initializing Faster-Whisper model (base, int8)...", "STT")
+        start_time = time.time()
+        _stt_model = WhisperModel("base", device="cpu", compute_type="int8")
+        elapsed = (time.time() - start_time) * 1000
+        log("STT", f"Faster-Whisper model loaded in {elapsed:.0f}ms", "SUCCESS")
+    return _stt_model
 
+
+def transcribe_audio_local(audio_bytes: bytes) -> str:
+    """
+    Local STT using Faster-Whisper - no API calls.
+    ~60% faster than OpenAI API, zero cost, works offline.
+    """
+    import tempfile
+    import os as temp_os
+
+    # Write audio to temp file (Faster-Whisper requires file path)
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        f.write(audio_bytes)
+        temp_path = f.name
+
+    try:
+        model = get_stt_model()
+        segments, _ = model.transcribe(temp_path, language="en")
+        text = " ".join([seg.text for seg in segments]).strip()
+        return text
+    finally:
+        temp_os.unlink(temp_path)
+
+
+def transcribe_audio_openai(audio_bytes: bytes) -> str:
+    """
+    Cloud STT using OpenAI's Whisper API.
+    Used as fallback when local STT is unavailable or fails.
+    """
     audio_file = io.BytesIO(audio_bytes)
     audio_file.name = "recording.wav"
 
@@ -165,10 +208,50 @@ def transcribe_audio(audio_bytes: bytes) -> str:
         file=audio_file,
         language="en",
     )
-
-    elapsed = (time.time() - start_time) * 1000
-    log("STT", f"Transcription complete in {elapsed:.0f}ms: \"{transcription.text[:50]}...\"", "SUCCESS")
     return transcription.text
+
+
+def transcribe_audio(audio_bytes: bytes) -> str:
+    """
+    Convert audio to text with local-first, API fallback.
+    Part of the chained voice architecture: Audio → Text
+
+    Fallback chain:
+    1. Faster-Whisper (local) - ~300ms, free, offline
+    2. OpenAI Whisper API (cloud) - ~800ms, paid
+    """
+    log("STT", f"Received audio: {len(audio_bytes)} bytes", "STT")
+    start_time = time.time()
+
+    # 1. Try local STT first (Faster-Whisper)
+    if FASTER_WHISPER_AVAILABLE:
+        log("STT", "Attempting Faster-Whisper (local) STT...", "STT")
+        try:
+            text = transcribe_audio_local(audio_bytes)
+            elapsed = (time.time() - start_time) * 1000
+            preview = text[:50] + "..." if len(text) > 50 else text
+            log("STT", f"FASTER-WHISPER (local) succeeded in {elapsed:.0f}ms: \"{preview}\"", "SUCCESS")
+            return text
+        except Exception as e:
+            elapsed = (time.time() - start_time) * 1000
+            log("STT", f"Faster-Whisper failed after {elapsed:.0f}ms: {e}", "WARNING")
+    else:
+        log("STT", "Faster-Whisper not available, using API fallback", "WARNING")
+
+    # 2. Fallback to OpenAI Whisper API
+    log("STT", "Attempting OpenAI Whisper (cloud) STT...", "STT")
+    fallback_start = time.time()
+    try:
+        text = transcribe_audio_openai(audio_bytes)
+        elapsed = (time.time() - fallback_start) * 1000
+        total_elapsed = (time.time() - start_time) * 1000
+        preview = text[:50] + "..." if len(text) > 50 else text
+        log("STT", f"OPENAI (cloud) succeeded in {elapsed:.0f}ms (total: {total_elapsed:.0f}ms): \"{preview}\"", "SUCCESS")
+        return text
+    except Exception as e:
+        elapsed = (time.time() - start_time) * 1000
+        log("STT", f"All STT methods failed after {elapsed:.0f}ms: {e}", "ERROR")
+        raise
 
 
 def generate_speech(text: str, voice: str = "af_heart") -> bytes:

@@ -88,6 +88,14 @@ print('Pre-loading Kokoro model...'); \
 p = KPipeline(lang_code='a'); \
 print('Kokoro model cached successfully!')" || echo "Kokoro pre-load skipped (will download on first use)"
 
+# Pre-download Faster-Whisper model for local STT (Phase 1 Voice Upgrade)
+# Uses 'base' model with int8 quantization for optimal speed/size balance
+RUN python -c "\
+from faster_whisper import WhisperModel; \
+print('Pre-loading Faster-Whisper model (base, int8)...'); \
+m = WhisperModel('base', device='cpu', compute_type='int8'); \
+print('Faster-Whisper model cached successfully!')" || echo "Faster-Whisper pre-load skipped (will download on first use)"
+
 # ============================================================
 # Final stage
 # ============================================================

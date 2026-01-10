@@ -1,15 +1,33 @@
 # Voice Feature Project Plan: Zoocari Voice Mode
 
+## ⚠️ Production Blocker: HTTPS Required for STT
+
+> **Voice STT does NOT work over the internet without HTTPS.**
+> Browser security requires secure context for microphone access (`getUserMedia()`).
+
+| Environment | Voice Input | Notes |
+|-------------|-------------|-------|
+| `localhost:8501` | ✅ Works | Localhost is trusted |
+| `http://10.0.0.x:8501` | ❌ Blocked | Insecure context |
+| `https://zoocari.example.com` | ✅ Works | Secure context |
+
+**Priority**: Resolve in Phase 5 before production deployment.
+
+---
+
 ## Current Status: Kokoro Local TTS Integration
 
 | Phase | Status | Description |
 |-------|--------|-------------|
 | Phase 1 | ✅ Complete | Audio Input Integration |
 | Phase 2 | ✅ Complete | Text-to-Speech Output (ElevenLabs) |
-| Phase 2.5 | 🟡 In Progress | **Kokoro Local TTS** (latency optimization) |
+| Phase 2.5 | ✅ Complete | **Kokoro Local TTS** (latency optimization) |
 | Phase 3 | ✅ Complete | UI/UX Enhancements |
 | Phase 4 | ⏳ Pending | Integration & Polish |
 | Phase 5 | ⏳ Pending | HTTPS Deployment (Mobile Support) |
+| **Phase 6** | 🟡 **NEW** | **Local STT + Enhanced TTS Options** |
+
+> **NEW**: See [VOICE_UPGRADE_PLAN.md](./VOICE_UPGRADE_PLAN.md) for detailed research on open-source STT/TTS alternatives.
 
 ---
 
@@ -182,39 +200,83 @@ def generate_speech(text: str, voice_id: str = "21m00Tcm4TlvDq8ikWAM") -> bytes:
 
 ---
 
-### Phase 5: HTTPS Deployment ⏳ PENDING (NEW)
-**Goal**: Enable mobile voice recording via secure context
+### Phase 5: HTTPS Deployment ⏳ PENDING (BLOCKER)
+**Goal**: Enable voice recording via secure context (REQUIRED for production STT)
+
+> **Why**: Browsers block `getUserMedia()` (microphone) on insecure origins.
+> Voice input works on localhost but fails on `http://` remote access.
 
 | Task | Status | Description |
 |------|--------|-------------|
 | 5.1 | ⏳ | Choose deployment method |
-| 5.2 | ⏳ | Configure HTTPS/SSL |
-| 5.3 | ⏳ | Test mobile voice recording |
+| 5.2 | ⏳ | Configure HTTPS/SSL termination |
+| 5.3 | ⏳ | Test voice recording over HTTPS |
 | 5.4 | ⏳ | Production deployment |
 
-**Deployment Options**:
+**HTTPS Termination Options**:
 
-| Option | Complexity | Cost | Best For |
-|--------|------------|------|----------|
-| **Streamlit Cloud** | Easy | Free | Quick deployment |
-| **Cloudflare Tunnel** | Easy | Free | Self-hosted, no ports |
-| **ngrok** | Easy | Free/Paid | Testing only |
-| **Nginx + Let's Encrypt** | Medium | Free | Production self-hosted |
-| **Cloud Provider** | Medium | Varies | Scalable production |
+| Option | Complexity | Cost | Pros | Cons |
+|--------|------------|------|------|------|
+| **Cloudflare Tunnel** | Easy | Free | No ports, auto-HTTPS, DDoS protection | Requires Cloudflare account |
+| **Streamlit Cloud** | Easy | Free | Zero config, built-in HTTPS | Limited customization |
+| **ngrok** | Easy | Free | Quick testing | Not for production |
+| **Caddy** | Easy | Free | Auto Let's Encrypt, simple config | Less common |
+| **Nginx + Let's Encrypt** | Medium | Free | Production-grade, flexible | More setup |
+| **Traefik** | Medium | Free | Docker-native, auto-certs | Learning curve |
+| **AWS ALB / GCP LB** | Medium | $$ | Scalable, managed | Cloud cost |
 
-**Docker + Nginx Setup** (for self-hosted):
+**Recommended: Cloudflare Tunnel** (Easiest for self-hosted)
+```bash
+# Install cloudflared
+brew install cloudflare/cloudflare/cloudflared
+
+# Login and create tunnel
+cloudflared tunnel login
+cloudflared tunnel create zoocari
+
+# Run tunnel (points to local Streamlit)
+cloudflared tunnel run --url http://localhost:8501 zoocari
+```
+
+**Alternative: Docker + Nginx + Let's Encrypt**
 ```yaml
 # docker-compose.yml additions
 services:
   nginx:
     image: nginx:alpine
     ports:
+      - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf
-      - ./certs:/etc/letsencrypt
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/letsencrypt:ro
     depends_on:
       - zoocari
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certs:/etc/letsencrypt
+```
+
+**Nginx Config (nginx.conf)**:
+```nginx
+server {
+    listen 443 ssl;
+    server_name zoocari.yourdomain.com;
+
+    ssl_certificate /etc/letsencrypt/live/zoocari.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/zoocari.yourdomain.com/privkey.pem;
+
+    location / {
+        proxy_pass http://zoocari:8501;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
 ```
 
 ---
@@ -255,6 +317,47 @@ ELEVENLABS_API_KEY=...
 
 ---
 
+### Phase 6: Local STT + Enhanced TTS 🟡 NEW
+**Goal**: Replace OpenAI Whisper API with local inference, evaluate enhanced TTS
+
+> **Full Details**: See [VOICE_UPGRADE_PLAN.md](./VOICE_UPGRADE_PLAN.md)
+
+| Task | Status | Description |
+|------|--------|-------------|
+| 6.1 | ⏳ | Add `faster-whisper` to requirements.txt |
+| 6.2 | ⏳ | Implement `transcribe_audio_local()` function |
+| 6.3 | ⏳ | Add local-first with API fallback logic |
+| 6.4 | ⏳ | Update Dockerfile for model caching |
+| 6.5 | ⏳ | Add warmup to entrypoint.sh |
+| 6.6 | ⏳ | Evaluate Orpheus/Chatterbox for emotion control |
+
+**Recommended Option (from research):**
+
+| Component | Current | Upgrade | Benefit |
+|-----------|---------|---------|---------|
+| STT | Whisper API (~800ms) | Faster-Whisper (~300ms) | 60% faster, free |
+| TTS | Kokoro (~100ms) | Keep or Orpheus (~200ms) | Emotion control |
+
+**Quick Win Implementation:**
+```python
+from faster_whisper import WhisperModel
+
+model = WhisperModel("base", device="cpu", compute_type="int8")
+
+def transcribe_audio_local(audio_bytes: bytes) -> str:
+    segments, _ = model.transcribe(audio_file)
+    return " ".join([seg.text for seg in segments])
+```
+
+**New Dependencies:**
+```txt
+faster-whisper>=1.0.0
+# Optional for enhanced TTS:
+# orpheus-speech>=0.1.0
+```
+
+---
+
 ## References
 
 - [ElevenLabs Python SDK](https://github.com/elevenlabs/elevenlabs-python)
@@ -263,3 +366,7 @@ ELEVENLABS_API_KEY=...
 - [OpenAI TTS API](https://platform.openai.com/docs/guides/text-to-speech)
 - [Streamlit st.audio_input](https://docs.streamlit.io/develop/api-reference/widgets/st.audio_input)
 - [MediaRecorder HTTPS Requirement](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia#privacy_and_security)
+- [Faster-Whisper GitHub](https://github.com/SYSTRAN/faster-whisper)
+- [Orpheus TTS GitHub](https://github.com/canopyai/Orpheus-TTS)
+- [Modal: Open Source STT Models](https://modal.com/blog/open-source-stt)
+- [BentoML: Open Source TTS Models](https://www.bentoml.com/blog/exploring-the-world-of-open-source-text-to-speech-models)
