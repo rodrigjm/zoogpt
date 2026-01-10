@@ -158,26 +158,22 @@ LEESBURG_PARK_ANIMALS = [
 ]
 
 # Exotic Animals - Unique species from specialty zoos
+# Note: Excludes animals already in LEESBURG_PARK_ANIMALS to avoid duplicates
 EXOTIC_ANIMALS = [
-    # Primates
-    "https://animals.sandiegozoo.org/animals/lemur",
+    # Primates (excluding lemur, gibbon - in Leesburg)
     "https://animals.sandiegozoo.org/animals/tamarin",
     "https://animals.sandiegozoo.org/animals/capuchin",
-    "https://animals.sandiegozoo.org/animals/gibbon",
-    # Exotic Cats
-    "https://animals.sandiegozoo.org/animals/serval",
+    # Exotic Cats (excluding serval - in Leesburg)
     "https://animals.sandiegozoo.org/animals/ocelot",
     "https://animals.sandiegozoo.org/animals/caracal",
     "https://animals.sandiegozoo.org/animals/lynx",
     # Bears
     "https://animals.sandiegozoo.org/animals/sun-bear",
     "https://animals.sandiegozoo.org/animals/spectacled-bear",
-    # Unique Mammals
+    # Unique Mammals (excluding coatimundi, wallaby - in Leesburg)
     "https://animals.sandiegozoo.org/animals/binturong",
-    "https://animals.sandiegozoo.org/animals/coatimundi",
     "https://animals.sandiegozoo.org/animals/kinkajou",
     "https://animals.sandiegozoo.org/animals/fennec-fox",
-    "https://animals.sandiegozoo.org/animals/wallaby",
     "https://animals.sandiegozoo.org/animals/wombat",
     # Reptiles
     "https://animals.sandiegozoo.org/animals/iguana",
@@ -186,12 +182,10 @@ EXOTIC_ANIMALS = [
     "https://animals.sandiegozoo.org/animals/gecko",
     "https://animals.sandiegozoo.org/animals/tortoise",
     "https://animals.sandiegozoo.org/animals/alligator",
-    # Exotic Birds
-    "https://animals.sandiegozoo.org/animals/macaw",
+    # Exotic Birds (excluding macaw, emu - in Leesburg)
     "https://animals.sandiegozoo.org/animals/cockatoo",
     "https://animals.sandiegozoo.org/animals/hornbill",
     "https://animals.sandiegozoo.org/animals/kookaburra",
-    "https://animals.sandiegozoo.org/animals/emu",
     "https://animals.sandiegozoo.org/animals/ostrich",
     "https://animals.sandiegozoo.org/animals/cassowary",
     # Aquatic/Semi-aquatic

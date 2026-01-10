@@ -15,6 +15,8 @@ from typing import Optional
 import numpy as np
 import soundfile as sf
 
+from utils.text import strip_markdown
+
 # Lazy-loaded pipeline (cached globally)
 _pipeline = None
 _pipeline_error = None
@@ -123,11 +125,7 @@ def generate_speech_kokoro(
         voice = VOICE_PRESETS[voice]
 
     # Clean text for TTS (remove markdown)
-    clean_text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # Remove bold
-    clean_text = re.sub(r'\*([^*]+)\*', r'\1', clean_text)  # Remove italic
-    clean_text = re.sub(r'#{1,6}\s*', '', clean_text)  # Remove headers
-    clean_text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', clean_text)  # Remove links
-    clean_text = clean_text.strip()
+    clean_text = strip_markdown(text)
 
     if not clean_text:
         raise ValueError("No text to convert to speech")

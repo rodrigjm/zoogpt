@@ -35,7 +35,9 @@ class OpenAITokenizerWrapper(PreTrainedTokenizerBase):
         return str(index)
 
     def get_vocab(self) -> Dict[str, int]:
-        return dict(enumerate(range(self.vocab_size)))
+        # Return token string -> token id mapping
+        # Since we represent tokens as string IDs, map "0" -> 0, "1" -> 1, etc.
+        return {str(i): i for i in range(self._vocab_size)}
 
     @property
     def vocab_size(self) -> int:
