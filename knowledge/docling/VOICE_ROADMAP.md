@@ -200,7 +200,7 @@ def generate_speech(text: str, voice_id: str = "21m00Tcm4TlvDq8ikWAM") -> bytes:
 
 ---
 
-### Phase 5: HTTPS Deployment ⏳ PENDING (BLOCKER)
+### Phase 5: HTTPS Deployment ✅ IMPLEMENTED (Cloudflare Tunnel)
 **Goal**: Enable voice recording via secure context (REQUIRED for production STT)
 
 > **Why**: Browsers block `getUserMedia()` (microphone) on insecure origins.
@@ -208,10 +208,21 @@ def generate_speech(text: str, voice_id: str = "21m00Tcm4TlvDq8ikWAM") -> bytes:
 
 | Task | Status | Description |
 |------|--------|-------------|
-| 5.1 | ⏳ | Choose deployment method |
-| 5.2 | ⏳ | Configure HTTPS/SSL termination |
+| 5.1 | ✅ | Choose deployment method (Cloudflare Tunnel) |
+| 5.2 | ✅ | Configure HTTPS/SSL termination |
 | 5.3 | ⏳ | Test voice recording over HTTPS |
 | 5.4 | ⏳ | Production deployment |
+
+**Implementation**: See [CLOUDFLARE_TUNNEL_SETUP.md](./CLOUDFLARE_TUNNEL_SETUP.md)
+
+**Quick Start**:
+```bash
+# Set tunnel token in .env
+CLOUDFLARE_TUNNEL_TOKEN=your-token-here
+
+# Start with tunnel
+docker compose --profile tunnel up -d
+```
 
 **HTTPS Termination Options**:
 
@@ -288,8 +299,9 @@ server {
 | `zoo_chat.py` | STT function, TTS function (ElevenLabs), voice mode UI | ✅ Done |
 | `requirements.txt` | Added `elevenlabs` package | ✅ Done |
 | `.env` | `ELEVENLABS_API_KEY` (optional) | ✅ Documented |
-| `docker-compose.yml` | HTTPS proxy (Phase 5) | ⏳ Pending |
-| `nginx.conf` | SSL configuration (Phase 5) | ⏳ Pending |
+| `docker-compose.yml` | Cloudflare Tunnel service (Phase 5) | ✅ Done |
+| `cloudflare/config.yml` | Tunnel configuration template | ✅ Done |
+| `CLOUDFLARE_TUNNEL_SETUP.md` | Setup documentation | ✅ Done |
 
 ---
 

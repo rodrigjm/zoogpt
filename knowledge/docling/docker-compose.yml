@@ -72,6 +72,32 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ============================================================
+  # Cloudflare Tunnel (HTTPS for mobile voice support)
+  # ============================================================
+  # Provides secure HTTPS access required for browser microphone API.
+  # See CLOUDFLARE_TUNNEL_SETUP.md for configuration steps.
+  #
+  # Prerequisites:
+  #   1. Create tunnel: cloudflared tunnel create zoocari
+  #   2. Add credentials.json to ./cloudflare/
+  #   3. Set CLOUDFLARE_TUNNEL_TOKEN in .env (or use credentials file)
+  # ============================================================
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: zoocari-tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    volumes:
+      # Mount tunnel credentials and config
+      - ./cloudflare:/etc/cloudflared:ro
+    depends_on:
+      - zoocari
+    profiles:
+      - tunnel  # Only start with: docker compose --profile tunnel up
+
 # Named volumes for persistent model cache
 volumes:
   zoocari-hf-cache:

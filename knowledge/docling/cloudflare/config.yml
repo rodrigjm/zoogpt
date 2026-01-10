@@ -1,0 +1,38 @@
+# ============================================================
+# Cloudflare Tunnel Configuration for Zoocari
+# ============================================================
+#
+# This file configures the Cloudflare Tunnel to route HTTPS traffic
+# to the local Zoocari Streamlit application.
+#
+# IMPORTANT: Replace YOUR_TUNNEL_ID and YOUR_DOMAIN with your values
+#
+# Setup Steps:
+#   1. cloudflared tunnel login
+#   2. cloudflared tunnel create zoocari
+#   3. Copy the tunnel ID from output
+#   4. Update this file with your tunnel ID and domain
+#   5. cloudflared tunnel route dns zoocari YOUR_SUBDOMAIN.YOUR_DOMAIN
+#
+# ============================================================
+
+# Your tunnel ID (from: cloudflared tunnel create zoocari)
+# Example: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+tunnel: YOUR_TUNNEL_ID
+
+# Path to credentials file (auto-generated during tunnel creation)
+credentials-file: /etc/cloudflared/credentials.json
+
+# Ingress rules - route traffic to Zoocari
+ingress:
+  # Route all traffic for your domain to the Zoocari app
+  - hostname: "*.YOUR_DOMAIN"
+    service: http://zoocari:8501
+    originRequest:
+      # WebSocket support for Streamlit
+      noTLSVerify: false
+      connectTimeout: 30s
+      tcpKeepAlive: 30s
+
+  # Catch-all rule (required by cloudflared)
+  - service: http_status:404
