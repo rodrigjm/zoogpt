@@ -39,9 +39,9 @@ services:
       # Optional: ElevenLabs fallback TTS
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
 
-      # TTS Configuration
-      - TTS_VOICE=${TTS_VOICE:-af_heart}
-      - TTS_PROVIDER=${TTS_PROVIDER:-kokoro}
+      # TTS Configuration (openai is fastest for Docker, kokoro only for native/GPU)
+      - TTS_VOICE=${TTS_VOICE:-nova}
+      - TTS_PROVIDER=${TTS_PROVIDER:-openai}
 
       # Python settings for unbuffered logging
       - PYTHONUNBUFFERED=1

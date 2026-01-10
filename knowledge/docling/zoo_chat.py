@@ -15,11 +15,18 @@ import lancedb
 import io
 import os
 import time
+import uuid
 from pathlib import Path
 from openai import OpenAI
 from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 from utils.text import strip_markdown, sanitize_html, load_css_file
+from session_manager import (
+    get_or_create_session,
+    save_message,
+    get_chat_history,
+    get_session_stats
+)
 
 # ============================================================
 # LOGGING UTILITIES
@@ -253,20 +260,19 @@ def transcribe_audio(audio_bytes: bytes) -> str:
         raise
 
 
-def generate_speech(text: str, voice: str = "af_heart") -> bytes:
+def generate_speech(text: str, voice: str = "nova") -> bytes:
     """
-    Convert text to speech with tiered fallback for optimal latency:
-    1. Kokoro (local) - fastest, free, ~50-200ms
+    Convert text to speech with optimized fallback chain.
+
+    Priority (optimized for Docker/cloud deployment):
+    1. OpenAI TTS (cloud) - fast, reliable, ~300-800ms
     2. ElevenLabs (cloud) - high quality, ~500-2000ms
-    3. OpenAI (cloud) - reliable fallback, ~300-800ms
+    3. Kokoro (local) - only if TTS_PROVIDER=kokoro (slow on CPU)
 
-    Kokoro Voice Options (kid-friendly):
-    - "af_bella" - Friendly female, clear pronunciation (default)
-    - "af_nova" - Warm, engaging female
-    - "af_heart" - Expressive, upbeat female
-    - "am_adam" - Clear male voice
-
-    Falls back to cloud TTS if local inference fails.
+    OpenAI Voice Options:
+    - "nova" - Warm, engaging female (default, kid-friendly)
+    - "alloy" - Neutral, balanced
+    - "shimmer" - Expressive female
     """
     log("TTS", f"Starting TTS generation for {len(text)} chars, voice={voice}", "TTS")
 
@@ -274,63 +280,67 @@ def generate_speech(text: str, voice: str = "af_heart") -> bytes:
     clean_text = strip_markdown(text)
     log("TTS", f"Cleaned text: {len(clean_text)} chars", "INFO")
 
-    # 1. Try Kokoro (local) first - fastest option
-    if KOKORO_AVAILABLE and is_kokoro_available():
+    # Check if user explicitly wants Kokoro (for native/GPU environments)
+    tts_provider = os.getenv("TTS_PROVIDER", "openai").lower()
+
+    # 1. Try Kokoro ONLY if explicitly configured (slow on CPU)
+    if tts_provider == "kokoro" and KOKORO_AVAILABLE and is_kokoro_available():
         log("TTS", "Attempting Kokoro (local) TTS...", "TTS")
         start_time = time.time()
         try:
-            audio = generate_speech_kokoro(clean_text, voice=voice)
+            kokoro_voice = "af_heart" if voice in ["nova", "shimmer"] else "am_adam"
+            audio = generate_speech_kokoro(clean_text, voice=kokoro_voice)
             elapsed = (time.time() - start_time) * 1000
-            log("TTS", f"✅ KOKORO (local) succeeded in {elapsed:.0f}ms, {len(audio)} bytes", "SUCCESS")
+            log("TTS", f"KOKORO (local) succeeded in {elapsed:.0f}ms, {len(audio)} bytes", "SUCCESS")
             return audio
         except Exception as e:
             elapsed = (time.time() - start_time) * 1000
             log("TTS", f"Kokoro failed after {elapsed:.0f}ms: {e}", "WARNING")
-    else:
-        log("TTS", "Kokoro not available, skipping local TTS", "WARNING")
 
-    # 2. Fallback to ElevenLabs (cloud)
+    # 2. OpenAI TTS - fast and reliable (~300-800ms)
+    log("TTS", "Attempting OpenAI (cloud) TTS...", "TTS")
+    start_time = time.time()
+    try:
+        with client.audio.speech.with_streaming_response.create(
+            model="tts-1",
+            voice=voice if voice in ["alloy", "echo", "fable", "onyx", "nova", "shimmer"] else "nova",
+            input=clean_text[:4096],  # OpenAI TTS limit
+        ) as response:
+            audio_bytes = response.read()
+            elapsed = (time.time() - start_time) * 1000
+            log("TTS", f"OPENAI (cloud) succeeded in {elapsed:.0f}ms, {len(audio_bytes)} bytes", "SUCCESS")
+            return audio_bytes
+    except Exception as e:
+        elapsed = (time.time() - start_time) * 1000
+        log("TTS", f"OpenAI TTS failed after {elapsed:.0f}ms: {e}", "WARNING")
+
+    # 3. Fallback to ElevenLabs (cloud)
     if elevenlabs_client:
         log("TTS", "Attempting ElevenLabs (cloud) TTS...", "TTS")
         start_time = time.time()
         try:
-            # Map Kokoro voice to ElevenLabs voice ID
             elevenlabs_voice_map = {
-                "af_bella": "EXAVITQu4vr4xnSDxMaL",  # Bella
-                "af_nova": "21m00Tcm4TlvDq8ikWAM",   # Rachel
-                "am_adam": "TxGEqnHWrfWFTfGW9XjX",   # Josh
+                "nova": "21m00Tcm4TlvDq8ikWAM",     # Rachel
+                "shimmer": "EXAVITQu4vr4xnSDxMaL",  # Bella
+                "alloy": "TxGEqnHWrfWFTfGW9XjX",    # Josh
             }
-            voice_id = elevenlabs_voice_map.get(voice, "iEbJsqzb6jw8MYxZ2xca")
-            log("TTS", f"Using ElevenLabs voice_id={voice_id}", "INFO")
+            voice_id = elevenlabs_voice_map.get(voice, "21m00Tcm4TlvDq8ikWAM")
 
             audio = elevenlabs_client.text_to_speech.convert(
                 voice_id=voice_id,
-                text=clean_text[:5000],  # ElevenLabs limit
+                text=clean_text[:5000],
                 model_id="eleven_multilingual_v2",
                 output_format="mp3_44100_128"
             )
             audio_bytes = b"".join(audio)
             elapsed = (time.time() - start_time) * 1000
-            log("TTS", f"✅ ELEVENLABS (cloud) succeeded in {elapsed:.0f}ms, {len(audio_bytes)} bytes", "SUCCESS")
+            log("TTS", f"ELEVENLABS (cloud) succeeded in {elapsed:.0f}ms, {len(audio_bytes)} bytes", "SUCCESS")
             return audio_bytes
         except Exception as e:
             elapsed = (time.time() - start_time) * 1000
             log("TTS", f"ElevenLabs failed after {elapsed:.0f}ms: {e}", "WARNING")
-    else:
-        log("TTS", "ElevenLabs client not configured, skipping", "WARNING")
 
-    # 3. Final fallback to OpenAI TTS
-    log("TTS", "Attempting OpenAI (cloud) TTS as final fallback...", "TTS")
-    start_time = time.time()
-    with client.audio.speech.with_streaming_response.create(
-        model="tts-1",
-        voice="nova",
-        input=clean_text[:4096],  # OpenAI TTS limit
-    ) as response:
-        audio_bytes = response.read()
-        elapsed = (time.time() - start_time) * 1000
-        log("TTS", f"✅ OPENAI (cloud) succeeded in {elapsed:.0f}ms, {len(audio_bytes)} bytes", "SUCCESS")
-        return audio_bytes
+    raise RuntimeError("All TTS providers failed")
 
 
 # ============================================================
@@ -424,9 +434,74 @@ CSS_FILE = Path(__file__).parent / "static" / "zoocari.css"
 st.markdown(load_css_file(CSS_FILE), unsafe_allow_html=True)
 
 # ============================================================
-# INITIALIZE STATE
+# INITIALIZE STATE & SESSION MANAGEMENT
 # ============================================================
 
+# Generate or retrieve persistent session ID (stored in browser via query params)
+def get_persistent_session_id() -> str:
+    """
+    Get or create a persistent session ID that survives page refreshes.
+    Uses Streamlit's query parameters to store the session ID in the URL,
+    which persists across refreshes within the same browser tab.
+    """
+    # Check if we have a session ID in query params
+    query_params = st.query_params
+    session_id = query_params.get("sid")
+
+    if not session_id:
+        # Generate new session ID
+        session_id = str(uuid.uuid4())[:16]
+        # Store in query params (survives page refresh)
+        st.query_params["sid"] = session_id
+        log("SESSION", f"Created new session: {session_id}", "SUCCESS")
+    else:
+        log("SESSION", f"Resumed existing session: {session_id}", "INFO")
+
+    return session_id
+
+
+# Initialize persistent session
+if "persistent_session_id" not in st.session_state:
+    st.session_state.persistent_session_id = get_persistent_session_id()
+
+    # Get or create session in database
+    session_info = get_or_create_session(st.session_state.persistent_session_id)
+    st.session_state.session_info = session_info
+
+    if session_info["is_new"]:
+        log("SESSION", "New session created in database", "SUCCESS")
+    else:
+        log("SESSION", f"Session loaded - {session_info['message_count']} messages in history", "INFO")
+
+# Load chat history from database on session resume
+if "history_loaded" not in st.session_state:
+    st.session_state.history_loaded = True
+    session_id = st.session_state.persistent_session_id
+
+    # Load existing chat history
+    history = get_chat_history(session_id, limit=50)
+    if history:
+        st.session_state.messages = [
+            {"role": msg["role"], "content": msg["content"]}
+            for msg in history
+        ]
+        # Set last question/response from history
+        for msg in reversed(history):
+            if msg["role"] == "assistant" and not st.session_state.get("last_response"):
+                st.session_state.last_response = msg["content"]
+            if msg["role"] == "user" and not st.session_state.get("last_question"):
+                st.session_state.last_question = msg["content"]
+            if st.session_state.get("last_response") and st.session_state.get("last_question"):
+                break
+
+        # Extract follow-up questions from last response
+        if st.session_state.get("last_response"):
+            _, followups = extract_followup_questions(st.session_state.last_response)
+            st.session_state.followup_questions = followups
+
+        log("SESSION", f"Loaded {len(history)} messages from history", "SUCCESS")
+
+# Initialize remaining state variables
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "last_response" not in st.session_state:
@@ -592,6 +667,29 @@ with left_panel:
                 args=(f"Tell me about {animal.lower()}!",)
             )
 
+        # Session info and New Chat button
+        st.markdown("---")
+        session_col1, session_col2 = st.columns([2, 1])
+
+        with session_col1:
+            # Show session stats
+            stats = get_session_stats(st.session_state.persistent_session_id)
+            if stats["message_count"] > 0:
+                st.markdown(f"""
+                <div style="font-size: 0.75rem; color: #666; padding: 4px 0;">
+                    📊 This session: {stats["message_count"]} messages
+                </div>
+                """, unsafe_allow_html=True)
+
+        with session_col2:
+            # New Chat button
+            if st.button("🔄 New Chat", use_container_width=True, help="Start a fresh conversation"):
+                # Generate new session ID and clear state
+                new_session_id = str(uuid.uuid4())[:16]
+                st.query_params["sid"] = new_session_id
+                st.session_state.clear()
+                st.rerun()
+
         # Footer in left panel
         st.markdown("""
         <div class="footer">
@@ -614,10 +712,46 @@ with right_panel:
     response_container = st.container(border=False)
 
 with response_container:
+    # Show chat history if there are previous messages
+    history_messages = st.session_state.get("messages", [])
+    if len(history_messages) > 2:  # More than just the current Q&A pair
+        with st.expander(f"📜 Chat History ({len(history_messages) // 2} conversations)", expanded=False):
+            # Show older messages (all except the last pair)
+            for i in range(0, len(history_messages) - 2, 2):
+                if i + 1 < len(history_messages) - 2:
+                    user_msg = history_messages[i]
+                    assistant_msg = history_messages[i + 1]
+
+                    if user_msg["role"] == "user":
+                        st.markdown(f"""
+                        <div style="background: #f0f2f6; border-radius: 8px; padding: 8px 12px; margin: 4px 0;">
+                            <span style="font-weight: 600; color: #3d332a;">🧒 You:</span>
+                            <span style="color: #555;">{sanitize_html(user_msg["content"][:100])}{'...' if len(user_msg["content"]) > 100 else ''}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    if assistant_msg["role"] == "assistant":
+                        # Extract main response without follow-ups
+                        main_resp, _ = extract_followup_questions(assistant_msg["content"])
+                        st.markdown(f"""
+                        <div style="background: #e8f4ea; border-radius: 8px; padding: 8px 12px; margin: 4px 0 12px 0;">
+                            <span style="font-weight: 600; color: #2d5a3d;">🐘 Zoocari:</span>
+                            <span style="color: #555;">{sanitize_html(main_resp[:150])}{'...' if len(main_resp) > 150 else ''}</span>
+                        </div>
+                        """, unsafe_allow_html=True)
+
     if submit_button and user_question:
-        # Clear previous and add new question
-        st.session_state.messages = [{"role": "user", "content": user_question}]
+        # Add new question to messages (don't clear history)
+        st.session_state.messages.append({"role": "user", "content": user_question})
         st.session_state.last_question = user_question
+
+        # Save user message to database
+        save_message(
+            st.session_state.persistent_session_id,
+            "user",
+            user_question
+        )
+        log("SESSION", f"Saved user message to database", "DB")
 
         # Response container
         st.markdown('<div class="response-container">', unsafe_allow_html=True)
@@ -658,9 +792,18 @@ with response_container:
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Save full response
+        # Save full response to session state
         st.session_state.messages.append({"role": "assistant", "content": response})
         st.session_state.last_response = response
+
+        # Save assistant message to database with metadata
+        save_message(
+            st.session_state.persistent_session_id,
+            "assistant",
+            response,
+            metadata={"confidence": confidence, "sources": [s["animal"] for s in sources]}
+        )
+        log("SESSION", f"Saved assistant response to database", "DB")
 
         # Generate and play TTS audio response with styled player
         with st.spinner("🔊 Generating voice response..."):

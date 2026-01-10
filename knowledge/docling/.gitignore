@@ -45,6 +45,9 @@ Thumbs.db
 data/
 *.pkl
 *.pickle
+*.db
+*.sqlite
+*.sqlite3
 
 # Jupyter
 .ipynb_checkpoints/

@@ -64,6 +64,7 @@ COPY zoo_chat.py .
 COPY tts_kokoro.py .
 COPY zoo_build_knowledge.py .
 COPY zoo_sources.py .
+COPY session_manager.py .
 COPY zoocari_mascot_web.png .
 COPY entrypoint.sh .
 COPY utils/ ./utils/
