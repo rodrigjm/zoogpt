@@ -1,0 +1,69 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api.dev
+    container_name: zoocari-api-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount source code for hot reload
+      - ../apps/api:/app/apps/api
+      # Mount data directory for LanceDB and SQLite
+      - ../data:/app/data
+    environment:
+      # API settings
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_RELOAD=true
+      # Database paths (relative to /app)
+      - LANCEDB_PATH=/app/data/zoo_lancedb
+      - SESSION_DB_PATH=/app/data/sessions.db
+      # CORS: allow web container and host
+      - CORS_ORIGINS=http://localhost:5173,http://web:5173
+      # OpenAI API key from .env file
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # TTS settings
+      - TTS_PROVIDER=${TTS_PROVIDER:-kokoro}
+      - TTS_VOICE=${TTS_VOICE:-af_heart}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      # STT settings
+      - STT_PROVIDER=${STT_PROVIDER:-faster-whisper}
+      # RAG settings
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+    networks:
+      - zoocari
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    working_dir: /app/apps/api
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web.dev
+    container_name: zoocari-web-dev
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source code for hot reload
+      - ../apps/web:/app
+      # Preserve node_modules in container (don't overwrite with host)
+      - /app/node_modules
+    environment:
+      # Point to API service by container name
+      - VITE_API_URL=http://api:8000
+      # Enable Vite HMR (Hot Module Replacement)
+      - VITE_HMR_HOST=localhost
+    networks:
+      - zoocari
+    depends_on:
+      api:
+        condition: service_healthy
+
+networks:
+  zoocari:
+    driver: bridge

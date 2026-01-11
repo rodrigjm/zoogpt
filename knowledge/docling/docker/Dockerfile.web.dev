@@ -1,0 +1,20 @@
+# Development Dockerfile for Vite + React frontend
+# Supports hot reload with vite dev
+
+FROM node:20-slim
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files first for better layer caching
+COPY apps/web/package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Expose Vite dev server port
+EXPOSE 5173
+
+# Development command with hot reload
+# --host 0.0.0.0 allows external connections from host machine
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
