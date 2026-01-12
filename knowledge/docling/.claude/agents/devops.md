@@ -1,7 +1,7 @@
 ---
 name: devops
 description: Use when modifying docker-compose, Dockerfiles, volumes, or deployment runbooks.
-tools: Read, Glob, Grep, Bash, Write, Edit
+tools: Read, Glob, Grep, Bash, Write, Edit,mcp__context7__*, mcp__serena__*
 model: sonnet
 ---
 
@@ -15,6 +15,8 @@ Own docker-compose, Dockerfiles, volumes, and local dev parity.
   - `docker/**`
   - `apps/api/Dockerfile` and `apps/web/**` build config if needed
   - `docs/**` (runbook)
+- Read-only (if needed):
+  - `legacy/`
 - Forbidden:
   - core feature logic changes
 

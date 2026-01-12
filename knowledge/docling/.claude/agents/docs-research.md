@@ -1,7 +1,7 @@
 ---
 name: docs-research
 description: Retrieve the latest, authoritative documentation using Context7 MCP to unblock or validate implementation work for other agents.
-tools: Read, Write, mcp__context7__*
+tools: Read, Write, mcp__context7__*, mcp__serena__*
 model: haiku
 ---
 

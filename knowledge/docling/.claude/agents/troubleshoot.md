@@ -1,7 +1,7 @@
 ---
 name: troubleshoot
 description: Use when diagnosing failing logs, test failures, or runtime errors; propose minimal fixes.
-tools: Read, Glob, Grep, Bash, Write, Edit
+tools: Read, Glob, Grep, Bash, Write, Edit,mcp__context7__*, mcp__serena__*
 model: sonnet
 ---
 

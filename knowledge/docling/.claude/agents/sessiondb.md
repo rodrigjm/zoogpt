@@ -1,7 +1,7 @@
 ---
 name: sessiondb
 description: Use when implementing SQLite-backed session persistence, schema, or session endpoints.
-tools: Read, Glob, Grep, Bash, Write, Edit
+tools: Read, Glob, Grep, Bash, Write, Edit,mcp__context7__*, mcp__serena__*
 model: sonnet
 ---
 
@@ -19,6 +19,7 @@ Own session persistence, schema, migrations, and session endpoints behavior.
   - `docs/**` (schema docs)
 - Read-only:
   - `docs/integration/CONTRACT.md`
+  - `legacy/`
 - Forbidden:
   - `apps/web/**`
 

@@ -1,7 +1,7 @@
 ---
 name: frontend
 description: Use when implementing React UI, Zustand stores, hooks, or fetch client integration in apps/web.
-tools: Read, Glob, Grep, Bash, Write, Edit
+tools: Read, Glob, Grep, Bash, Write, Edit, mcp__context7__*, mcp__serena__*
 model: sonnet
 ---
 
@@ -16,7 +16,7 @@ Implement UI and client logic that strictly matches `docs/integration/CONTRACT.m
   - `docs/integration/**`
 - Read-only (if needed):
   - `apps/api/app/models/**` (DTO alignment only)
-  - `*.py`
+  - `legacy/`
 - Forbidden:
   - `apps/api/**` (except models read-only)
   - `docker/**`, `scripts/**`, `data/**`

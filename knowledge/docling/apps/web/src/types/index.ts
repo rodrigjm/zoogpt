@@ -31,6 +31,24 @@ export interface GetSessionResponse {
   metadata?: Record<string, unknown>;
 }
 
+export interface Session {
+  session_id: string;
+  created_at: string; // ISO-8601
+  last_active?: string; // ISO-8601
+  message_count: number;
+  client: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ChatMessage {
+  message_id: string;
+  session_id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  created_at: string; // ISO-8601
+  metadata?: Record<string, unknown>;
+}
+
 // ===== Chat Types =====
 
 export interface ChatRequest {
@@ -40,12 +58,26 @@ export interface ChatRequest {
   metadata?: Record<string, unknown>;
 }
 
+export interface Source {
+  animal: string;
+  title: string;
+}
+
 export interface ChatResponse {
   session_id: string;
   message_id: string;
   reply: string;
-  sources: unknown[]; // To be defined based on RAG implementation
+  sources: Source[];
   created_at: string; // ISO-8601
+  followup_questions: string[];
+  confidence: number; // 0.0 - 1.0
+}
+
+export interface StreamChunk {
+  type: 'text' | 'done' | 'error';
+  content?: string;
+  followup_questions?: string[];
+  sources?: Source[];
 }
 
 // ===== Voice Types (STT/TTS) =====

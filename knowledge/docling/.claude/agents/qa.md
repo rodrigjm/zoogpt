@@ -1,7 +1,7 @@
 ---
 name: qa
 description: Use when writing or fixing tests (Vitest, Playwright) and integration smoke tests.
-tools: Read, Glob, Grep, Bash, Write, Edit, mcp__playwright__*
+tools: Read, Glob, Grep, Bash, Write, Edit, mcp__playwright__*, mcp__serena__*
 model: sonnet
 ---
 
@@ -16,6 +16,8 @@ Own tests: unit (Vitest) + e2e (Playwright) + integration smoke tests.
   - `apps/api/tests/**`
   - `tests/integration/**`
   - `docs/integration/**` (ensure tests reflect contract)
+- Read-only (if needed):
+  - `legacy/`
 - Forbidden:
   - major feature code changes (report issues instead)
 

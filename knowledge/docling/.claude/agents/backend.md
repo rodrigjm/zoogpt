@@ -1,7 +1,7 @@
 ---
 name: backend
 description: Use when implementing FastAPI routers, Pydantic models, or backend services in apps/api using authoratative documentation when required
-tools: Read, Glob, Grep, Bash, Write, Edit, mcp__context7__*
+tools: Read, Glob, Grep, Bash, Write, Edit,mcp__context7__*, mcp__serena__*
 model: sonnet
 ---
 
@@ -16,6 +16,7 @@ Implement/adjust FastAPI endpoints per `docs/integration/CONTRACT.md`.
   - `docs/integration/**`
 - Read-only (if needed):
   - `*.py`
+  - `legacy/`
 - Forbidden:
   - `apps/web/**`
   - `docker/**` (unless explicitly requested)

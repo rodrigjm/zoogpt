@@ -1,7 +1,7 @@
 ---
 name: rag
 description: Use when working on LanceDB retrieval, RAG pipeline, or chat retrieval logic (apps/api/app/services/rag.py).
-tools: Read, Glob, Grep, Bash, Write, Edit
+tools: Read, Glob, Grep, Bash, Write, Edit,mcp__context7__*, mcp__serena__*
 model: sonnet
 ---
 
@@ -18,6 +18,7 @@ Own `apps/api/app/services/rag.py` and LanceDB integration under `data/zoo_lance
 - Read-only:
   - `apps/api/app/routers/chat.py`
   - `apps/api/app/models/chat.py`
+  - `legacy/`
 - Forbidden:
   - `apps/web/**`
   - Session DB code (handled by SessionDB agent)

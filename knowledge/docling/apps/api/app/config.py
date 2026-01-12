@@ -4,7 +4,16 @@ Loads environment variables from .env file.
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
+from pydantic import field_validator
+from typing import Optional, Union
+from pathlib import Path
+
+
+def parse_cors_list(v: Union[str, list[str]]) -> list[str]:
+    """Parse comma-separated CORS origins from environment variable."""
+    if isinstance(v, str):
+        return [origin.strip() for origin in v.split(",") if origin.strip()]
+    return v if v else []
 
 
 class Settings(BaseSettings):
@@ -40,8 +49,31 @@ class Settings(BaseSettings):
     # Session Settings
     session_db_path: str = "data/sessions.db"
 
-    # CORS Settings
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:8501"]
+    @field_validator("lancedb_path", "session_db_path", mode="before")
+    @classmethod
+    def resolve_data_paths(cls, v: str) -> str:
+        """Resolve relative data paths to absolute paths from project root."""
+        if not Path(v).is_absolute() and v.startswith("data/"):
+            # Find project root (directory containing populated data/ folder)
+            current = Path(__file__).resolve()
+            for parent in current.parents:
+                target_path = parent / v
+                # Check if the full path exists and has content
+                if target_path.exists():
+                    # For lancedb_path, verify it contains .lance files
+                    if "lancedb" in v.lower():
+                        if any(target_path.glob("*.lance")):
+                            return str(target_path)
+                    else:
+                        return str(target_path)
+        return v
+
+    # CORS Settings - stored as string, parsed in main.py
+    cors_origins: str = "http://localhost:3000,http://localhost:8501"
+
+    def get_cors_origins(self) -> list[str]:
+        """Get CORS origins as a list."""
+        return parse_cors_list(self.cors_origins)
 
 
 # Global settings instance

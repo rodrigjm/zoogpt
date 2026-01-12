@@ -5,11 +5,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Agent & Subagent Workflow Rules
 
 IMPORTANT:
-Agents and subagents must be used to control scope, cost, and complexity.
+- Agents and subagents must be used to control scope, cost, and complexity.
+- read docs/integration for latest agent workflow contract, migrations steps and status - 
 
 ### When to Use Subagents
 - Use subagents for their intended purposes as in the subagent mission
-- Do NOT use subagents for final decisions or project-wide planning.
+- use MCP as need - specifically mcp__serena__*  for codebase understanding and impact analysis, and mcp__context7__* for documentation/troubleshooting
+- Do NOT use subagents for final decisions, projectplan tracking, or project-wide planning.
+- If the subagent task is long-running, maintain updates and inter-agent communciations as part of status.md file with the current progress and next steps. Main agent (you) should not rely on reading the full execution log for state.
 
 ### Collaboration Model
 - Subagents collaborate ONLY through shared artifacts:
@@ -46,6 +49,7 @@ Tokens are a shared, finite resource. Claude must actively manage context size.
 - Never paste large logs or files into the main thread if a subagent can analyze them.
 - Do not restate previously agreed plans or contracts unless they change.
 - Avoid reloading files that have already been summarized.
+- If writting markdown file/memory/overview - write into /docs folder with hierchichal naming convention
 
 ### Subagent Token Discipline
 - Use subagents for any task that:
