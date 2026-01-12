@@ -2,17 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+
 ## Agent & Subagent Workflow Rules
 
 IMPORTANT:
 - Agents and subagents must be used to control scope, cost, and complexity.
-- read docs/integration for latest agent workflow contract, migrations steps and status - 
 
 ### When to Use Subagents
 - Use subagents for their intended purposes as in the subagent mission
 - use MCP as need - specifically mcp__serena__*  for codebase understanding and impact analysis, and mcp__context7__* for documentation/troubleshooting
 - Do NOT use subagents for final decisions, projectplan tracking, or project-wide planning.
 - If the subagent task is long-running, maintain updates and inter-agent communciations as part of status.md file with the current progress and next steps. Main agent (you) should not rely on reading the full execution log for state.
+
+
 
 ### Collaboration Model
 - Subagents collaborate ONLY through shared artifacts:
@@ -32,6 +34,53 @@ IMPORTANT:
 ### Authority
 - The main agent (this session) is the final decision-maker.
 - Subagents propose; the main agent approves and integrates.
+
+### File Reading Discipline (CRITICAL)
+
+**Before reading any file, ask: "Do I need the whole file or just a section?"**
+
+#### Large Files (>200 lines)
+- **migration.md, STATUS.md, CONTRACT.md**: Use `offset/limit` to read only relevant sections
+- **Source files**: Read symbol/function definitions only, not entire files
+- **Test files**: Read only failing test, not entire test suite
+- Example: To check acceptance criteria, read lines 450-500, not all 1300 lines
+
+#### Incremental Reading Pattern
+```
+1. First read: offset=0, limit=50 (get structure/TOC)
+2. Identify target section line numbers
+3. Second read: offset=target, limit=needed (get specific content)
+```
+
+#### Never Re-read
+- If a file was read in this session, reference prior content
+- If file changed, read only the delta (use git diff or targeted read)
+- Cache key facts mentally: "STATUS.md shows Phase 1 complete, Phase 2 in progress"
+
+#### Grep Before Read
+- Use `Grep` with `head_limit=10` to find relevant sections first
+- Then read only those sections with offset/limit
+
+### Subagent Prompt Discipline
+
+When spawning agents, always include:
+```
+## Response Format
+Return ONLY:
+- Summary (≤10 bullets)
+- Files changed (paths only)
+- Verification command (1 line)
+
+Do NOT return:
+- Code snippets (reference file:line instead)
+- Reasoning or exploration steps
+- Full file contents
+```
+
+### Session Checkpoints
+- At 50% context (~100k tokens): Consider `/compact`
+- At 70% context (~140k tokens): Must `/compact` or risk truncation
+- Before large operations: Check context with `/context`
 
 ## Token Budget & Context Discipline
 

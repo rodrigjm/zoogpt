@@ -37,6 +37,8 @@
 - 2026-01-11: Voice STT/TTS services implemented. STTService (apps/api/app/services/stt.py) with Faster-Whisper (local, base model, int8) → OpenAI Whisper API fallback. TTSService (apps/api/app/services/tts.py) with Kokoro (local, kid-friendly voices) → OpenAI TTS API fallback. Voice presets: bella, nova, heart, sarah, adam, eric, default. Markdown stripping and text chunking (800 chars) for optimal TTS quality. Smart audio format detection for test compatibility. Integrated into POST /voice/stt and POST /voice/tts routers. All 18 voice tests passing. Verification scripts updated.
 - 2026-01-11: SSE streaming implemented. POST /chat/stream endpoint with Server-Sent Events using sse-starlette. Added generate_response_stream() method to RAGService. SSE event sequence: session validation → context search → stream text chunks {"type": "text", "content": "..."} → done event {"type": "done", "sources": [...], "followup_questions": [...]}. Error events: {"type": "error", "content": "..."}. Uses existing StreamChunk model. Verification script: verify_chat_stream.sh.
 - 2026-01-11: **Phase 2 started.** Task 2.1 (TypeScript Types) completed. Updated apps/web/src/types/index.ts with Session, ChatMessage, Source, StreamChunk types. ChatResponse updated with followup_questions and confidence fields. All types match backend models exactly. No TypeScript errors.
+- 2026-01-12: Task 2.3 (Zustand Stores) completed. Created 3 stores in apps/web/src/stores/: sessionStore.ts (session lifecycle with localStorage persistence), chatStore.ts (messages, streaming, sources, followup questions), voiceStore.ts (MediaRecorder, STT, TTS, playback). All stores use typed API client functions. TypeScript compilation and Vite build pass.
+- 2026-01-12: **Phase 3 started.** Task 3.1 (useVoiceRecorder Hook) completed. Created apps/web/src/hooks/useVoiceRecorder.ts with MediaRecorder + getUserMedia. Supports audio/webm (preferred) with audio/mp4 fallback for Safari. Duration tracking every 100ms. State: isRecording, isPreparing, audioBlob, duration, error. Methods: startRecording, stopRecording, cancelRecording, reset. Proper cleanup of stream tracks, timers on unmount. Created apps/web/src/hooks/index.ts for re-exports. TypeScript compilation passes.
 
 ## Missing Services (Priority)
 
@@ -153,10 +155,52 @@ Per migration.md acceptance criteria, the following services need actual impleme
     - [x] All types defined
     - [x] Types match API contracts exactly (verified against apps/api/app/models/*.py)
     - [x] No TypeScript errors (npx tsc --noEmit passed)
-- [ ] Task 2.2: Create API Client
-- [ ] Task 2.3: Create Zustand Stores
-- [ ] Task 2.4: Create Layout Component
-- [ ] Task 2.5: Create MessageBubble Component
-- [ ] Task 2.6: Create AnimalGrid Component
-- [ ] Task 2.7: Create ChatInput Component
-- [ ] Task 2.8: Create FollowupQuestions Component
+- [x] Task 2.2: Create API Client (2026-01-11)
+  - Implemented all API methods in `apps/web/src/lib/api.ts`
+  - **Methods Implemented:**
+    - `createSession(request)` - POST /api/session
+    - `getSession(sessionId)` - GET /api/session/{id}
+    - `sendChatMessage(request)` - POST /api/chat
+    - `streamChatMessage(request, onChunk, onComplete, onError)` - POST /api/chat/stream with SSE
+    - `speechToText(request)` - POST /api/voice/stt with multipart/form-data
+    - `textToSpeech(request)` - POST /api/voice/tts returns Blob
+    - `checkHealth()` - GET /api/health
+  - **Features:**
+    - SSE streaming implementation using fetch ReadableStream
+    - Proper FormData handling for STT (multipart upload)
+    - Blob response handling for TTS (audio bytes)
+    - Comprehensive error handling with fallback messages
+    - TypeScript types imported and used correctly
+  - **Acceptance Criteria:**
+    - [x] All API methods implemented
+    - [x] Error handling working (try/catch with ApiError parsing)
+    - [x] Streaming support working (SSE with ReadableStream parser)
+    - [x] TypeScript types correct (npx tsc --noEmit passed)
+- [x] Task 2.3: Create Zustand Stores
+  - [x] sessionStore.ts: session lifecycle, persist to localStorage
+  - [x] chatStore.ts: messages, streaming, sources, followup questions
+  - [x] voiceStore.ts: recording, STT, TTS, playback state
+  - [x] index.ts: re-export all stores
+  - [x] TypeScript compilation passed (npx tsc --noEmit)
+  - [x] Build passed (npm run build)
+- [x] Task 2.4: Create Layout Component
+  - [x] Layout.tsx: header with Zoocari branding, main content area, footer
+  - [x] Mobile-first responsive design with Leesburg brand colors
+  - [x] components/index.ts for clean imports
+- [x] Task 2.5: Create MessageBubble Component
+  - [x] MessageBubble.tsx: user (right/yellow) vs assistant (left/beige) bubbles
+  - [x] Streaming indicator with animated bouncing dots
+  - [x] Kid-friendly text size (text-lg) and rounded design
+  - [x] Sources display below assistant messages when available
+- [x] Task 2.6: Create AnimalGrid Component
+  - [x] AnimalGrid.tsx: Leesburg animals (Lions, Elephants, Giraffes, Camels, Emus, Servals, Porcupines, Lemurs)
+  - [x] 4x2 grid layout (4 cols desktop, 2 cols mobile), hover effects
+  - [x] onSelectAnimal callback prop, disabled state support
+- [x] Task 2.7: Create ChatInput Component
+  - [x] ChatInput.tsx: text input + send button + prominent mic button
+  - [x] Recording state with red pulsing animation
+  - [x] Voice-first design, large touch targets, Enter to submit
+- [x] Task 2.8: Create FollowupQuestions Component
+  - [x] FollowupQuestions.tsx: clickable pill-shaped question chips
+  - [x] Brown background with white text, orange hover
+  - [x] Flex-wrap layout, returns null when empty
