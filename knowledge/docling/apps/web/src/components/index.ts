@@ -3,6 +3,7 @@
  */
 
 export { default as AnimalGrid } from './AnimalGrid';
+export { default as AudioPlayer } from './AudioPlayer';
 export { default as ChatInput } from './ChatInput';
 export { default as FollowupQuestions } from './FollowupQuestions';
 export { default as Layout } from './Layout';
