@@ -84,8 +84,11 @@ class STTService:
         if model is None:
             raise RuntimeError(f"Faster-Whisper not available: {_stt_model_error}")
 
+        # Detect format and use correct extension (Faster-Whisper needs ffmpeg for non-WAV)
+        audio_format = self._detect_audio_format(audio_bytes) or "wav"
+
         # Write audio to temp file (Faster-Whisper requires file path)
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=f".{audio_format}", delete=False) as f:
             f.write(audio_bytes)
             temp_path = f.name
 
@@ -101,6 +104,45 @@ class STTService:
             except Exception as e:
                 logger.warning(f"[STT] Failed to delete temp file {temp_path}: {e}")
 
+    def _detect_audio_format(self, audio_bytes: bytes) -> Optional[str]:
+        """
+        Detect audio format from file bytes and return the appropriate extension.
+
+        Args:
+            audio_bytes: Audio file bytes
+
+        Returns:
+            File extension (e.g., 'wav', 'webm', 'mp3') or None if unknown
+        """
+        if len(audio_bytes) < 12:
+            return None
+
+        # WAV: RIFF....WAVE
+        if audio_bytes[:4] == b'RIFF' and audio_bytes[8:12] == b'WAVE':
+            return 'wav'
+
+        # MP3: ID3 or 0xFF 0xFB (MP3 frame sync)
+        if audio_bytes[:3] == b'ID3' or (audio_bytes[0] == 0xFF and audio_bytes[1] & 0xE0 == 0xE0):
+            return 'mp3'
+
+        # OGG: OggS
+        if audio_bytes[:4] == b'OggS':
+            return 'ogg'
+
+        # WebM/Matroska: 0x1A 0x45 0xDF 0xA3
+        if audio_bytes[:4] == b'\x1A\x45\xDF\xA3':
+            return 'webm'
+
+        # FLAC: fLaC
+        if audio_bytes[:4] == b'fLaC':
+            return 'flac'
+
+        # M4A/MP4: ftyp
+        if len(audio_bytes) >= 8 and audio_bytes[4:8] == b'ftyp':
+            return 'm4a'
+
+        return None
+
     def _is_valid_audio(self, audio_bytes: bytes) -> bool:
         """
         Check if audio bytes appear to be a valid audio file.
@@ -111,35 +153,7 @@ class STTService:
         Returns:
             True if the audio appears valid, False otherwise
         """
-        # Check for common audio file headers
-        if len(audio_bytes) < 12:
-            return False
-
-        # WAV: RIFF....WAVE
-        if audio_bytes[:4] == b'RIFF' and audio_bytes[8:12] == b'WAVE':
-            return True
-
-        # MP3: ID3 or 0xFF 0xFB (MP3 frame sync)
-        if audio_bytes[:3] == b'ID3' or (audio_bytes[0] == 0xFF and audio_bytes[1] & 0xE0 == 0xE0):
-            return True
-
-        # OGG: OggS
-        if audio_bytes[:4] == b'OggS':
-            return True
-
-        # WebM/Matroska: 0x1A 0x45 0xDF 0xA3
-        if audio_bytes[:4] == b'\x1A\x45\xDF\xA3':
-            return True
-
-        # FLAC: fLaC
-        if audio_bytes[:4] == b'fLaC':
-            return True
-
-        # M4A/MP4: ftyp
-        if len(audio_bytes) >= 8 and audio_bytes[4:8] == b'ftyp':
-            return True
-
-        return False
+        return self._detect_audio_format(audio_bytes) is not None
 
     def transcribe_openai(self, audio_bytes: bytes) -> str:
         """
@@ -151,14 +165,18 @@ class STTService:
         Returns:
             Transcribed text
         """
-        # Check if this looks like valid audio
-        # If not, it's likely test mock data - return a test-friendly response
-        if not self._is_valid_audio(audio_bytes):
+        # Detect audio format for correct file extension
+        audio_format = self._detect_audio_format(audio_bytes)
+
+        # If format not detected, it's likely test mock data
+        if not audio_format:
             logger.warning("[STT] Invalid audio format detected, returning mock transcription for testing")
             return "This is a mock transcription of your audio."
 
         audio_file = io.BytesIO(audio_bytes)
-        audio_file.name = "recording.wav"
+        # Use correct extension so OpenAI can decode properly
+        audio_file.name = f"recording.{audio_format}"
+        logger.info(f"[STT] Sending {audio_format} audio to OpenAI Whisper")
 
         transcription = self.openai_client.audio.transcriptions.create(
             model="whisper-1",

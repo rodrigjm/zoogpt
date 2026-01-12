@@ -238,6 +238,7 @@ class TTSService:
             model="tts-1",
             voice=openai_voice,
             input=truncated_text,
+            response_format="wav",  # Request WAV for browser compatibility
         ) as response:
             audio_bytes = response.read()
 

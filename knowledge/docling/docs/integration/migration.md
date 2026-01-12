@@ -1002,17 +1002,17 @@ tests/
 5. Add focus indicators
 
 **A11y Checklist:**
-- [ ] Voice button has aria-label
-- [ ] Messages have role="log"
-- [ ] Focus visible on all interactive elements
-- [ ] Color contrast >4.5:1
-- [ ] Keyboard-only navigation works
+- [x] Voice button has aria-label
+- [x] Messages have role="log"
+- [x] Focus visible on all interactive elements
+- [x] Color contrast >4.5:1
+- [x] Keyboard-only navigation works
 
 **Acceptance Criteria:**
-- [ ] ARIA labels present
-- [ ] Keyboard navigation works
-- [ ] Screen reader tested
-- [ ] Color contrast verified
+- [x] ARIA labels present
+- [x] Keyboard navigation works
+- [ ] Screen reader tested (requires manual verification)
+- [x] Color contrast verified
 
 ---
 

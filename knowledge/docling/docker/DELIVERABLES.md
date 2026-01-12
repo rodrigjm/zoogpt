@@ -1,11 +1,11 @@
-# Task 0.4 Deliverables Summary
+# Docker Deliverables Summary
 
 ## Overview
 
-Development Docker Compose setup for Zoocari migration - Phase 0, Task 0.4.
+Docker configuration for Zoocari - Development and Production environments.
 
-**Status:** Complete
-**Date:** 2026-01-10
+**Status:** Phase 0 Complete, Phase 6.1 Complete
+**Date:** 2026-01-10 (Phase 0), 2026-01-12 (Phase 6.1)
 **Agent:** DevOps
 
 ## Files Created
@@ -205,13 +205,66 @@ docker exec zoocari-api-dev ls -la /app/data
 - depends_on API with condition: service_healthy
 - Ensures API is ready before web starts
 
+## Phase 6.1: Production Dockerfile (2026-01-12)
+
+### Files Added
+
+#### 1. `docker/Dockerfile.api` (Production)
+Multi-stage production Dockerfile for API with frontend.
+
+**Key features:**
+- Stage 1 (builder): Pre-downloads ML models (Faster-Whisper base, Kokoro TTS)
+- Stage 2 (runtime): Python 3.12-slim with production config
+- Non-root user: zoocari:1000
+- Static file serving: Built frontend from apps/web/dist → /app/static
+- Health check: Built-in Docker healthcheck at /health
+- Production command: uvicorn with 2 workers, no reload
+- Image size: ~1.5-2GB (acceptable for ML workloads)
+
+#### 2. `docker/BUILD_VERIFICATION.md` (Documentation)
+Comprehensive verification guide for production builds.
+
+**Contents:**
+- Build instructions
+- Verification steps (6 checks)
+- Acceptance criteria checklist
+- Troubleshooting guide
+- Next steps for Phase 6.2+
+
+#### 3. `docker/verify_production_build.sh` (Automation)
+Automated verification script for production image.
+
+**Checks:**
+1. Docker installation
+2. Frontend build status
+3. Image build success
+4. Image size validation
+5. Container startup
+6. Health endpoint test
+
+**Usage:**
+```bash
+cd docker
+./verify_production_build.sh
+```
+
+### Code Changes
+
+#### apps/api/app/main.py
+Added StaticFiles middleware for production frontend serving:
+- Imports: `Path`, `StaticFiles`
+- Conditional mounting: Only if `static/` directory exists
+- SPA routing: `html=True` for client-side routing support
+
 ## Known Limitations
 
 1. **LanceDB dependency:** Assumes `data/zoo_lancedb/` exists. Build knowledge base separately (different task).
 
 2. **OPENAI_API_KEY required:** Services won't start without valid key in .env file.
 
-3. **Development only:** Not production-ready (Task 6.1 will create production Dockerfiles).
+3. **Development vs Production:**
+   - Development: Use `docker-compose.dev.yml` for hot reload
+   - Production: Use `Dockerfile.api` for optimized deployment
 
 4. **Platform:** Optimized for Linux/macOS. Windows users need WSL2 for proper file watching.
 

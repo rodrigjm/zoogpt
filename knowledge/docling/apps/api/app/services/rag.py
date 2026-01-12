@@ -97,14 +97,14 @@ class RAGService:
         Returns:
             Tuple of (context_string, sources_list, confidence_score)
         """
-        # Search the table
-        results = self.table.search(query).limit(num_results).to_pandas()
+        # Search the table (using to_list() to avoid pandas dependency)
+        results = self.table.search(query).limit(num_results).to_list()
 
         contexts = []
         sources = []
         distances = []
 
-        for _, row in results.iterrows():
+        for row in results:
             # Extract metadata
             metadata = row.get("metadata", {})
             if metadata is None:

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import type { ChatMessage, Source } from '../types';
 
 interface MessageBubbleProps {
@@ -15,12 +15,14 @@ const StreamingIndicator: React.FC = () => (
   </div>
 );
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming = false, sources }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isStreaming = false, sources }) => {
   const isUser = message.role === 'user';
 
   return (
     <div className={`flex w-full mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
+        role="article"
+        aria-label={`${isUser ? 'User' : 'Assistant'} message`}
         className={`
           max-w-[75%] px-6 py-4 rounded-3xl shadow-md
           ${isUser
@@ -45,6 +47,16 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isStreaming = fa
       </div>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison: only re-render if props actually changed
+  return (
+    prevProps.message.content === nextProps.message.content &&
+    prevProps.message.message_id === nextProps.message.message_id &&
+    prevProps.isStreaming === nextProps.isStreaming &&
+    prevProps.sources?.length === nextProps.sources?.length
+  );
+});
+
+MessageBubble.displayName = 'MessageBubble';
 
 export default MessageBubble;

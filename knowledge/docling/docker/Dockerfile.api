@@ -1,0 +1,82 @@
+# Production Dockerfile for Zoocari API
+# Multi-stage build with ML model pre-download and static frontend serving
+
+# ============================================================================
+# Stage 1: Build stage - pre-download ML models
+# ============================================================================
+FROM python:3.12-slim AS builder
+
+# Install system dependencies for model downloads
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /models
+
+# Install Python dependencies needed for model downloads
+RUN pip install --no-cache-dir \
+    faster-whisper>=1.0.0 \
+    kokoro>=0.9.4 \
+    huggingface-hub
+
+# Pre-download Faster-Whisper base model for STT
+# This prevents cold start delays in production
+RUN python -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='int8')"
+
+# Pre-download Kokoro TTS model (if available via HuggingFace)
+# Kokoro models are cached in ~/.cache/kokoro or similar
+RUN python -c "import kokoro; kokoro.generate('test', voice='af_heart')" || true
+
+# ============================================================================
+# Stage 2: Production runtime
+# ============================================================================
+FROM python:3.12-slim
+
+# Install system dependencies for runtime
+# espeak-ng: Required for Kokoro TTS phonemization
+# libsndfile1: Required for audio file I/O (soundfile)
+# curl: Health check support
+RUN apt-get update && apt-get install -y \
+    espeak-ng \
+    libsndfile1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user for security
+RUN useradd -m -u 1000 zoocari && \
+    mkdir -p /app /app/data && \
+    chown -R zoocari:zoocari /app
+
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY apps/api/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy pre-downloaded models from builder stage
+COPY --from=builder /root/.cache /root/.cache
+
+# Copy application code
+COPY apps/api/app ./app
+COPY apps/api/.env.example .env.example
+
+# Copy built frontend static files
+# These will be served by FastAPI using StaticFiles middleware
+COPY apps/web/dist ./static
+
+# Create data directory for LanceDB and SQLite
+RUN mkdir -p /app/data && chown -R zoocari:zoocari /app/data
+
+# Switch to non-root user
+USER zoocari
+
+# Expose API port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Production command (no reload)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

@@ -1,0 +1,89 @@
+# Production Docker Compose for Zoocari
+# Includes health checks, resource limits, logging, and optional Cloudflare tunnel
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: zoocari-api-prod
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount LanceDB vector database (read-only in production)
+      - ../data/zoo_lancedb:/app/data/zoo_lancedb:ro
+      # Mount SQLite sessions (read-write)
+      - ../data/sessions.db:/app/data/sessions.db
+      # Optional: Mount alternative data directory
+      # - ../data:/app/data
+    environment:
+      # API settings
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_RELOAD=false
+      # Database paths (relative to /app)
+      - LANCEDB_PATH=/app/data/zoo_lancedb
+      - SESSION_DB_PATH=/app/data/sessions.db
+      # CORS: specify production origins
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://zoocari.example.com}
+      # OpenAI API key from .env file or environment
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # TTS settings
+      - TTS_PROVIDER=${TTS_PROVIDER:-kokoro}
+      - TTS_VOICE=${TTS_VOICE:-af_heart}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+      # STT settings
+      - STT_PROVIDER=${STT_PROVIDER:-faster-whisper}
+      # RAG settings
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
+    networks:
+      - zoocari
+    # Health checks (every 30s as specified)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Resource limits (4GB memory as specified)
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    # Logging configuration (10MB rotation, 3 files)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional Cloudflare Tunnel service
+  # Enable with: docker compose --profile cloudflare up
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: zoocari-cloudflared
+    restart: unless-stopped
+    profiles:
+      - cloudflare
+    command: tunnel run
+    environment:
+      # Set TUNNEL_TOKEN in .env file
+      - TUNNEL_TOKEN=${TUNNEL_TOKEN}
+    networks:
+      - zoocari
+    depends_on:
+      api:
+        condition: service_healthy
+    # Logging configuration (same as api)
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  zoocari:
+    driver: bridge

@@ -68,7 +68,7 @@ export default function VoiceButton({
             session_id: sessionId,
             audio: audioBlob,
           });
-          onTranscript(response.transcript);
+          onTranscript(response.text);
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to process audio';
@@ -95,7 +95,7 @@ export default function VoiceButton({
 
   // Visual states
   const getButtonClasses = (): string => {
-    const baseClasses = 'relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer';
+    const baseClasses = 'relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer focus:outline-none focus:ring-4';
 
     if (disabled) {
       return `${baseClasses} bg-gray-300 cursor-not-allowed`;
@@ -103,13 +103,13 @@ export default function VoiceButton({
 
     switch (buttonState) {
       case 'idle':
-        return `${baseClasses} bg-gradient-to-br from-leesburg-yellow to-yellow-500 hover:shadow-lg animate-pulse`;
+        return `${baseClasses} bg-gradient-to-br from-leesburg-yellow to-yellow-500 hover:shadow-lg animate-pulse focus:ring-yellow-300`;
       case 'preparing':
-        return `${baseClasses} bg-gray-400`;
+        return `${baseClasses} bg-gray-400 focus:ring-gray-300`;
       case 'recording':
-        return `${baseClasses} bg-gradient-to-br from-leesburg-orange to-red-500 shadow-lg animate-pulse`;
+        return `${baseClasses} bg-gradient-to-br from-leesburg-orange to-red-500 shadow-lg animate-pulse focus:ring-red-300`;
       case 'processing':
-        return `${baseClasses} bg-gray-400`;
+        return `${baseClasses} bg-gray-400 focus:ring-gray-300`;
       default:
         return baseClasses;
     }
@@ -205,6 +205,7 @@ export default function VoiceButton({
             ? 'Stop recording'
             : buttonState
         }
+        aria-busy={buttonState === 'processing' || buttonState === 'preparing'}
       >
         {renderIcon()}
       </button>
@@ -217,7 +218,7 @@ export default function VoiceButton({
           <button
             type="button"
             onClick={handleCancel}
-            className="w-8 h-8 rounded-full bg-gray-300 hover:bg-gray-400 flex items-center justify-center transition-colors"
+            className="min-w-11 min-h-11 w-11 h-11 rounded-full bg-gray-300 hover:bg-gray-400 flex items-center justify-center transition-colors"
             aria-label="Cancel recording"
           >
             <svg

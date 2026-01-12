@@ -13,6 +13,7 @@ interface UseAudioPlayerReturn extends UseAudioPlayerState {
   pause: () => void;
   stop: () => void;
   seek: (time: number) => void;
+  reset: () => void;
 }
 
 export function useAudioPlayer(): UseAudioPlayerReturn {
@@ -68,7 +69,12 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
       };
 
       const handleError = () => {
-        setError('Failed to load audio');
+        const audioError = audio.error;
+        const errorMsg = audioError
+          ? `Failed to load audio: ${audioError.code} - ${audioError.message}`
+          : 'Failed to load audio: unknown error';
+        console.error('[AudioPlayer] Error:', errorMsg, 'src:', audio.src);
+        setError(errorMsg);
         setIsPlaying(false);
         setIsLoading(false);
       };
@@ -108,6 +114,20 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     }
   }, []);
 
+  // Reset all state (for when audio source changes)
+  const reset = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    revokeObjectUrl();
+    setIsPlaying(false);
+    setIsLoading(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setError(null);
+  }, [revokeObjectUrl]);
+
   // Seek to specific time
   const seek = useCallback((time: number) => {
     if (audioRef.current) {
@@ -137,5 +157,6 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     pause,
     stop,
     seek,
+    reset,
   };
 }

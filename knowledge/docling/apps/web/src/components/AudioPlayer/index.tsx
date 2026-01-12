@@ -19,7 +19,7 @@ export default function AudioPlayer({
   autoPlay = false,
   onEnded,
 }: AudioPlayerProps) {
-  const { isPlaying, isLoading, currentTime, duration, error, play, pause, seek } =
+  const { isPlaying, isLoading, currentTime, duration, error, play, pause, seek, reset } =
     useAudioPlayer();
 
   const hasLoadedRef = useRef(false);
@@ -28,6 +28,8 @@ export default function AudioPlayer({
   // Load audio when audioBlob changes
   useEffect(() => {
     if (audioBlob && audioBlob !== audioBlobRef.current) {
+      // Reset previous audio state before loading new blob
+      reset();
       audioBlobRef.current = audioBlob;
       hasLoadedRef.current = false;
 
@@ -36,7 +38,7 @@ export default function AudioPlayer({
         hasLoadedRef.current = true;
       }
     }
-  }, [audioBlob, autoPlay, play]);
+  }, [audioBlob, autoPlay, play, reset]);
 
   // Call onEnded callback when playback ends
   useEffect(() => {
@@ -48,13 +50,8 @@ export default function AudioPlayer({
   const handlePlayPause = () => {
     if (isPlaying) {
       pause();
-    } else if (hasLoadedRef.current) {
-      // Resume playback
-      const audio = new Audio(URL.createObjectURL(audioBlob));
-      audio.currentTime = currentTime;
-      // Note: This is a simplified version; hook handles the actual playback
-      play(audioBlob);
     } else {
+      // Always play with current blob - hook handles cleanup
       play(audioBlob);
       hasLoadedRef.current = true;
     }

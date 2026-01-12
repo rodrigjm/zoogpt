@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 
 interface AnimalGridProps {
   onSelectAnimal: (animal: string) => void;
@@ -21,18 +21,23 @@ const animals: Animal[] = [
   { name: 'Lemur', emoji: '🐒' },
 ];
 
-const AnimalGrid: React.FC<AnimalGridProps> = ({ onSelectAnimal, disabled = false }) => {
+const AnimalGrid: React.FC<AnimalGridProps> = memo(({ onSelectAnimal, disabled = false }) => {
   return (
     <div className="w-full max-w-4xl mx-auto px-4 py-6">
       <h2 className="text-2xl font-bold text-leesburg-brown mb-4 text-center">
         Pick an animal to learn about!
       </h2>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div
+        role="group"
+        aria-label="Animal selection buttons"
+        className="grid grid-cols-2 md:grid-cols-4 gap-4"
+      >
         {animals.map((animal) => (
           <button
             key={animal.name}
             onClick={() => !disabled && onSelectAnimal(animal.name)}
             disabled={disabled}
+            aria-label={`Learn about ${animal.name}`}
             className={`
               bg-leesburg-beige
               text-leesburg-brown
@@ -48,6 +53,9 @@ const AnimalGrid: React.FC<AnimalGridProps> = ({ onSelectAnimal, disabled = fals
               gap-2
               border-2
               border-transparent
+              focus:outline-none
+              focus:ring-4
+              focus:ring-leesburg-orange/30
               ${
                 disabled
                   ? 'opacity-50 cursor-not-allowed'
@@ -64,6 +72,8 @@ const AnimalGrid: React.FC<AnimalGridProps> = ({ onSelectAnimal, disabled = fals
       </div>
     </div>
   );
-};
+});
+
+AnimalGrid.displayName = 'AnimalGrid';
 
 export default AnimalGrid;

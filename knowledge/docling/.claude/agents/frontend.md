@@ -1,7 +1,7 @@
 ---
 name: frontend
 description: Use when implementing React UI, Zustand stores, hooks, or fetch client integration in apps/web.
-tools: Read, Glob, Grep, Bash, Write, Edit, mcp__context7__*, mcp__serena__*
+tools: Read, Glob, Grep, Bash, Write, Edit, mcp__context7__*, mcp__serena__*, mcp__playwright__*
 model: sonnet
 ---
 
