@@ -19,3 +19,10 @@ class TTSRequest(BaseModel):
     session_id: str
     text: str
     voice: str = "default"
+
+
+class TTSStreamRequest(BaseModel):
+    """Request model for POST /voice/tts/stream (SSE streaming)."""
+    session_id: str
+    message: str  # User query to generate response for
+    voice: str = "default"

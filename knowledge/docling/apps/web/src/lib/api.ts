@@ -13,6 +13,9 @@ import type {
   SttRequest,
   SttResponse,
   TtsRequest,
+  TtsStreamRequest,
+  TtsStreamAudioChunk,
+  TtsStreamDoneData,
   HealthResponse,
   ApiError,
   StreamChunk,
@@ -218,6 +221,107 @@ export async function textToSpeech(
   const blob = await response.blob();
   // Re-create blob with explicit audio/wav type to ensure browser recognizes it
   return new Blob([blob], { type: 'audio/wav' });
+}
+
+/**
+ * Stream TTS audio via SSE as RAG response is generated.
+ * Reduces latency by sending audio sentence-by-sentence.
+ *
+ * @param request - Session ID, user message, and optional voice
+ * @param onAudioChunk - Called for each audio chunk (base64 WAV)
+ * @param onComplete - Called when streaming is complete
+ * @param onError - Called on error
+ */
+export async function streamTextToSpeech(
+  request: TtsStreamRequest,
+  onAudioChunk: (chunk: TtsStreamAudioChunk) => void,
+  onComplete?: (data: TtsStreamDoneData) => void,
+  onError?: (error: Error) => void
+): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE}/voice/tts/stream`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      let errorMessage = 'TTS stream request failed';
+      try {
+        const error: ApiError = await response.json();
+        errorMessage = error.error.message || errorMessage;
+      } catch {
+        errorMessage = response.statusText || errorMessage;
+      }
+      throw new Error(errorMessage);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error('No response body');
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        // Handle SSE event format
+        if (line.startsWith('event: ')) {
+          continue; // Event type is in the next data line
+        }
+
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6).trim();
+          if (!data || data === '[DONE]') {
+            continue;
+          }
+
+          try {
+            const parsed = JSON.parse(data);
+
+            // Check what type of event this is based on content
+            if ('chunk' in parsed && 'sentence' in parsed) {
+              // Audio chunk event
+              onAudioChunk(parsed as TtsStreamAudioChunk);
+            } else if ('total_sentences' in parsed) {
+              // Done event
+              if (onComplete) {
+                onComplete(parsed as TtsStreamDoneData);
+              }
+            } else if ('code' in parsed && 'message' in parsed) {
+              // Error event
+              throw new Error(parsed.message || 'Stream error');
+            }
+          } catch (parseError) {
+            if (parseError instanceof SyntaxError) {
+              console.warn('Failed to parse SSE chunk:', parseError);
+            } else {
+              throw parseError;
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    if (onError) {
+      onError(error instanceof Error ? error : new Error('Unknown error'));
+    } else {
+      throw error;
+    }
+  }
 }
 
 // ===== Health API =====

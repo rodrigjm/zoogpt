@@ -10,10 +10,9 @@ IMPORTANT:
 
 ### When to Use Subagents
 - Use subagents for their intended purposes as in the subagent mission
-- use MCP as need - specifically mcp__serena__*  for codebase understanding and impact analysis, and mcp__context7__* for documentation/troubleshooting
+- use MCP as needed - if missing useful MCP recommend one
 - Do NOT use subagents for final decisions, projectplan tracking, or project-wide planning.
 - If the subagent task is long-running, maintain updates and inter-agent communciations as part of status.md file with the current progress and next steps. Main agent (you) should not rely on reading the full execution log for state.
-
 
 
 ### Collaboration Model

@@ -102,6 +102,24 @@ export interface TtsRequest {
 // TTS response is audio bytes (audio/mpeg or audio/wav)
 // No JSON response type needed
 
+// Streaming TTS (generates audio from query via RAG + TTS pipeline)
+export interface TtsStreamRequest {
+  session_id: string;
+  message: string; // User query to generate response for
+  voice?: string;
+}
+
+export interface TtsStreamAudioChunk {
+  chunk: string; // base64 encoded WAV audio
+  sentence: string; // The sentence that was synthesized
+  index: number; // Sentence index for ordering
+}
+
+export interface TtsStreamDoneData {
+  total_sentences: number;
+  sources?: Source[];
+}
+
 // ===== Health Types =====
 
 export interface HealthResponse {

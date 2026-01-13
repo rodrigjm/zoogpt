@@ -4,7 +4,8 @@
  */
 
 import { create } from 'zustand';
-import { speechToText, textToSpeech } from '../lib/api';
+import { speechToText, textToSpeech, streamTextToSpeech } from '../lib/api';
+import type { TtsStreamAudioChunk } from '../types';
 
 type VoiceMode = 'idle' | 'recording' | 'processing' | 'playing';
 
@@ -23,11 +24,16 @@ interface VoiceState {
   mediaRecorder: MediaRecorder | null;
   audioChunks: Blob[];
 
+  // Streaming state
+  streamingSentences: string[];
+  currentSentenceIndex: number;
+
   // Actions
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<Blob | null>;
   transcribe: (sessionId: string, audioBlob: Blob) => Promise<string>;
   speak: (sessionId: string, text: string) => Promise<void>;
+  speakStreaming: (sessionId: string, message: string, onSentence?: (sentence: string) => void) => Promise<void>;
   stopPlayback: () => void;
   setVoice: (voice: string) => void;
   setError: (error: string | null) => void;
@@ -46,6 +52,8 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   selectedVoice: 'bella',
   mediaRecorder: null,
   audioChunks: [],
+  streamingSentences: [],
+  currentSentenceIndex: 0,
 
   // Start recording from microphone
   startRecording: async () => {
@@ -186,6 +194,128 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     }
   },
 
+  // Convert text to speech with streaming (low-latency)
+  // Generates response from RAG and streams audio sentence-by-sentence
+  speakStreaming: async (sessionId: string, message: string, onSentence?: (sentence: string) => void) => {
+    const { selectedVoice, audioUrl: previousUrl } = get();
+
+    // Clean up previous audio
+    if (previousUrl) {
+      URL.revokeObjectURL(previousUrl);
+    }
+
+    set({
+      isProcessing: true,
+      mode: 'processing',
+      error: null,
+      streamingSentences: [],
+      currentSentenceIndex: 0,
+    });
+
+    // Audio queue for sequential playback
+    const audioQueue: Blob[] = [];
+    let isPlayingQueue = false;
+    let stopRequested = false;
+
+    // Helper to convert base64 to Blob
+    const base64ToBlob = (base64: string, mimeType: string = 'audio/wav'): Blob => {
+      const binaryString = atob(base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return new Blob([bytes], { type: mimeType });
+    };
+
+    // Play audio chunks sequentially
+    const playNextInQueue = async () => {
+      if (stopRequested || audioQueue.length === 0) {
+        isPlayingQueue = false;
+        // Check if we're done
+        if (audioQueue.length === 0 && !get().isProcessing) {
+          set({ isPlaying: false, mode: 'idle' });
+        }
+        return;
+      }
+
+      isPlayingQueue = true;
+      const audioBlob = audioQueue.shift()!;
+      const url = URL.createObjectURL(audioBlob);
+      const audio = new Audio(url);
+
+      set({ audioUrl: url, isPlaying: true, mode: 'playing' });
+
+      audio.onended = () => {
+        URL.revokeObjectURL(url);
+        set({ currentSentenceIndex: get().currentSentenceIndex + 1 });
+        playNextInQueue();
+      };
+
+      audio.onerror = () => {
+        URL.revokeObjectURL(url);
+        console.warn('Audio chunk playback failed, skipping to next');
+        playNextInQueue();
+      };
+
+      try {
+        await audio.play();
+      } catch (err) {
+        console.warn('Failed to play audio chunk:', err);
+        playNextInQueue();
+      }
+    };
+
+    try {
+      await streamTextToSpeech(
+        {
+          session_id: sessionId,
+          message,
+          voice: selectedVoice,
+        },
+        // onAudioChunk - called for each sentence's audio
+        (chunk: TtsStreamAudioChunk) => {
+          // Add sentence to display
+          set((state) => ({
+            streamingSentences: [...state.streamingSentences, chunk.sentence],
+          }));
+
+          // Notify caller
+          if (onSentence) {
+            onSentence(chunk.sentence);
+          }
+
+          // Convert base64 to blob and add to queue
+          const audioBlob = base64ToBlob(chunk.chunk);
+          audioQueue.push(audioBlob);
+
+          // Start playing if not already
+          if (!isPlayingQueue) {
+            set({ isProcessing: false }); // First chunk received, no longer "processing"
+            playNextInQueue();
+          }
+        },
+        // onComplete
+        () => {
+          set({ isProcessing: false });
+          // Queue will continue playing remaining chunks
+        },
+        // onError
+        (error) => {
+          set({
+            error: error.message,
+            isProcessing: false,
+            isPlaying: false,
+            mode: 'idle',
+          });
+        }
+      );
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Streaming TTS failed';
+      set({ error: errorMsg, isProcessing: false, mode: 'idle' });
+      throw err;
+    }
+  },
+
   // Stop audio playback
   stopPlayback: () => {
     // Note: We'd need to store the Audio element to stop it
@@ -225,6 +355,8 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       error: null,
       mediaRecorder: null,
       audioChunks: [],
+      streamingSentences: [],
+      currentSentenceIndex: 0,
     });
   },
 }));

@@ -15,7 +15,7 @@ from lancedb.pydantic import LanceModel, Vector
 from openai import OpenAI
 
 from utils.tokenizer import OpenAITokenizerWrapper
-from zoo_sources import get_phase1_urls, get_expanded_urls
+from zoo_sources import get_phase1_urls, get_all_urls
 
 load_dotenv()
 
@@ -212,12 +212,12 @@ def build_knowledge_base(verbose: bool = True, expanded: bool = True):
 
     # Get URLs based on mode
     if expanded:
-        urls = get_expanded_urls()
+        urls = get_all_urls()
         print(f"\nExpanded Mode: Processing {len(urls)} animal sources")
-        print("(Includes petting zoo, Leesburg Animal Park, and exotic animals)\n")
+        print("(Includes Nat Geo Kids, Ducksters, SeaWorld, Simple Wikipedia)\n")
     else:
         urls = get_phase1_urls()
-        print(f"\nPhase 1: Processing {len(urls)} animal sources\n")
+        print(f"\nPhase 1: Processing {len(urls)} animal sources (Nat Geo Kids)\n")
 
     # Step 1: Extract content
     print("Step 1: Extracting content from trusted sources")

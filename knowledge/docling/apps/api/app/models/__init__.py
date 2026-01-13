@@ -5,7 +5,7 @@ Pydantic models for API request/response validation.
 from .common import ErrorResponse, ErrorDetail
 from .session import SessionCreate, SessionResponse, Session, ChatMessage
 from .chat import ChatRequest, ChatResponse, StreamChunk
-from .voice import STTResponse, TTSRequest
+from .voice import STTResponse, TTSRequest, TTSStreamRequest
 
 __all__ = [
     "ErrorResponse",
@@ -19,4 +19,5 @@ __all__ = [
     "StreamChunk",
     "STTResponse",
     "TTSRequest",
+    "TTSStreamRequest",
 ]
