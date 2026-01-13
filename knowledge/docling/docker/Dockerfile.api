@@ -1,8 +1,23 @@
 # Production Dockerfile for Zoocari API
-# Multi-stage build with ML model pre-download and static frontend serving
+# Multi-stage build with frontend build, ML model pre-download, and static serving
 
 # ============================================================================
-# Stage 1: Build stage - pre-download ML models
+# Stage 1: Frontend build stage
+# ============================================================================
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /app
+
+# Copy package files and install dependencies
+COPY apps/web/package*.json ./
+RUN npm ci
+
+# Copy source and build
+COPY apps/web/ ./
+RUN npm run build
+
+# ============================================================================
+# Stage 2: ML models pre-download stage
 # ============================================================================
 FROM python:3.12-slim AS builder
 
@@ -29,7 +44,7 @@ RUN python -c "from faster_whisper import WhisperModel; WhisperModel('base', dev
 RUN python -c "import kokoro; kokoro.generate('test', voice='af_heart')" || true
 
 # ============================================================================
-# Stage 2: Production runtime
+# Stage 3: Production runtime
 # ============================================================================
 FROM python:3.12-slim
 
@@ -69,9 +84,9 @@ COPY utils ./utils
 # Install additional dependencies for knowledge base building
 RUN pip install --no-cache-dir docling docling-core
 
-# Copy built frontend static files
+# Copy built frontend static files from frontend-builder stage
 # These will be served by FastAPI using StaticFiles middleware
-COPY apps/web/dist ./static
+COPY --from=frontend-builder /app/dist ./static
 
 # Copy entrypoint script
 COPY docker/entrypoint.sh /entrypoint.sh
