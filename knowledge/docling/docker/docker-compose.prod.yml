@@ -11,12 +11,9 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Mount LanceDB vector database (read-only in production)
-      - ../data/zoo_lancedb:/app/data/zoo_lancedb:ro
-      # Mount SQLite sessions (read-write)
-      - ../data/sessions.db:/app/data/sessions.db
-      # Optional: Mount alternative data directory
-      # - ../data:/app/data
+      # Mount data directory (read-write for initial knowledge base build)
+      # After first run, LanceDB will be created if missing
+      - ../data:/app/data
     environment:
       # API settings
       - API_HOST=0.0.0.0

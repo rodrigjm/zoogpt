@@ -20,11 +20,23 @@ COPY apps/api/requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy knowledge base builder scripts (for conditional initialization)
+COPY zoo_build_knowledge.py .
+COPY zoo_sources.py .
+COPY utils ./utils
+
+# Install additional dependencies for knowledge base building
+RUN pip install --no-cache-dir docling docling-core
+
+# Copy entrypoint script
+COPY docker/entrypoint.dev.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Create data directory
 RUN mkdir -p /app/data
 
 # Expose API port
 EXPOSE 8000
 
-# Development command with hot reload
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# Use entrypoint for conditional knowledge base initialization
+ENTRYPOINT ["/entrypoint.sh"]

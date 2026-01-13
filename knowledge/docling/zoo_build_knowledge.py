@@ -26,12 +26,12 @@ client = OpenAI()
 tokenizer = OpenAITokenizerWrapper()
 MAX_TOKENS = 8191  # text-embedding-3-large's maximum context length
 
-# LanceDB settings
-DB_PATH = "data/zoo_lancedb"
+# LanceDB settings (use environment variable if set, for Docker compatibility)
+DB_PATH = os.environ.get("LANCEDB_PATH", "data/zoo_lancedb")
 TABLE_NAME = "animals"
 
 
-def extract_animal_content(urls: List[str], verbose: bool = True) -> List:
+def extract_animal_content(urls: List[str], verbose: bool = True) -> List[tuple]:
     """
     Extract content from animal education websites.
 
@@ -40,7 +40,7 @@ def extract_animal_content(urls: List[str], verbose: bool = True) -> List:
         verbose: Whether to print progress
 
     Returns:
-        List of docling Document objects
+        List of (document, url) tuples
     """
     converter = DocumentConverter()
     documents = []
@@ -56,7 +56,7 @@ def extract_animal_content(urls: List[str], verbose: bool = True) -> List:
 
             result = converter.convert(url)
             if result.document:
-                documents.append(result.document)
+                documents.append((result.document, url))  # Keep URL with document
                 if verbose:
                     print(f"    ✓ Extracted successfully")
         except Exception as e:
@@ -70,16 +70,16 @@ def extract_animal_content(urls: List[str], verbose: bool = True) -> List:
     return documents
 
 
-def chunk_documents(documents: List, verbose: bool = True) -> List:
+def chunk_documents(documents: List[tuple], verbose: bool = True) -> List[tuple]:
     """
     Chunk documents using hybrid chunking strategy.
 
     Args:
-        documents: List of docling Document objects
+        documents: List of (document, url) tuples
         verbose: Whether to print progress
 
     Returns:
-        List of chunks with metadata
+        List of (chunk, url) tuples with metadata
     """
     chunker = HybridChunker(
         tokenizer=tokenizer,
@@ -92,11 +92,12 @@ def chunk_documents(documents: List, verbose: bool = True) -> List:
     if verbose:
         print(f"Chunking {len(documents)} documents...")
 
-    for doc in documents:
+    for doc, url in documents:
         try:
             chunk_iter = chunker.chunk(dl_doc=doc)
             chunks = list(chunk_iter)
-            all_chunks.extend(chunks)
+            # Pair each chunk with its source URL
+            all_chunks.extend([(chunk, url) for chunk in chunks])
         except Exception as e:
             if verbose:
                 print(f"  ✗ Failed to chunk document: {str(e)[:50]}")
@@ -108,19 +109,19 @@ def chunk_documents(documents: List, verbose: bool = True) -> List:
     return all_chunks
 
 
-def prepare_chunks_for_db(chunks: List) -> List[dict]:
+def prepare_chunks_for_db(chunks: List[tuple]) -> List[dict]:
     """
     Prepare chunks for insertion into LanceDB.
 
     Args:
-        chunks: List of docling chunks
+        chunks: List of (chunk, url) tuples
 
     Returns:
         List of dictionaries ready for LanceDB
     """
     processed_chunks = []
 
-    for chunk in chunks:
+    for chunk, url in chunks:
         # Extract animal name from URL or title if possible
         animal_name = None
         if chunk.meta.headings:
@@ -132,6 +133,7 @@ def prepare_chunks_for_db(chunks: List) -> List[dict]:
                 "animal_name": animal_name,
                 "filename": chunk.meta.origin.filename if chunk.meta.origin else None,
                 "title": chunk.meta.headings[0] if chunk.meta.headings else None,
+                "url": url,  # Include source URL
             },
         })
 
@@ -164,6 +166,7 @@ def create_vector_db(processed_chunks: List[dict], verbose: bool = True):
         animal_name: str | None
         filename: str | None
         title: str | None
+        url: str | None
 
     # Define main schema
     class AnimalChunks(LanceModel):

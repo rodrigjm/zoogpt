@@ -10,8 +10,8 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   return (
     <div className="min-h-screen bg-leesburg-beige flex flex-col">
-      {/* Header */}
-      <header className="bg-leesburg-brown shadow-lg">
+      {/* Header - sticky at top */}
+      <header className="bg-leesburg-brown shadow-lg sticky top-0 z-40">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-center md:justify-start">
             <div className="text-center md:text-left">

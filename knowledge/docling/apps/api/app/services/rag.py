@@ -116,9 +116,10 @@ class RAGService:
                 else "Unknown"
             )
             title = metadata.get("title", "") if isinstance(metadata, dict) else ""
+            url = metadata.get("url", "") if isinstance(metadata, dict) else ""
 
             # Build source object
-            sources.append({"animal": animal_name, "title": title})
+            sources.append({"animal": animal_name, "title": title, "url": url})
 
             # Track distance for confidence calculation
             if "_distance" in row:

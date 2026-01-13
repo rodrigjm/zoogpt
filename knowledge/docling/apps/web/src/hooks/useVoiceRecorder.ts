@@ -99,7 +99,16 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
         duration: 0,
       }));
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to start recording';
+      let errorMessage = 'Failed to start recording';
+      if (err instanceof Error) {
+        if (err.name === 'NotAllowedError' || err.message.includes('Permission denied')) {
+          errorMessage = 'Microphone access denied. Please allow microphone in browser settings and refresh.';
+        } else if (err.name === 'NotFoundError') {
+          errorMessage = 'No microphone found. Please connect a microphone.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
       setState(prev => ({
         ...prev,
         error: errorMessage,

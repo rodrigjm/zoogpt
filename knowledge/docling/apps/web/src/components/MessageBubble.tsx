@@ -39,8 +39,22 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isStreaming
         )}
         {sources && sources.length > 0 && !isUser && (
           <div className="mt-3 pt-3 border-t border-leesburg-brown/20">
-            <p className="text-sm text-leesburg-brown/70">
-              Sources: {sources.map(s => `${s.animal} - ${s.title}`).join(', ')}
+            <p className="text-sm text-leesburg-brown/70 break-all">
+              Sources:{' '}
+              {[...new Set(sources.map(s => s.url).filter(Boolean))]
+                .map((url, i, arr) => (
+                  <span key={url}>
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-leesburg-orange hover:underline"
+                    >
+                      {url}
+                    </a>
+                    {i < arr.length - 1 && ', '}
+                  </span>
+                ))}
             </p>
           </div>
         )}

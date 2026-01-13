@@ -61,6 +61,7 @@ export interface ChatRequest {
 export interface Source {
   animal: string;
   title: string;
+  url?: string;
 }
 
 export interface ChatResponse {

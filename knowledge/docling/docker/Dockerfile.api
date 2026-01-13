@@ -61,9 +61,21 @@ COPY --from=builder /root/.cache /root/.cache
 COPY apps/api/app ./app
 COPY apps/api/.env.example .env.example
 
+# Copy knowledge base builder scripts (for conditional initialization)
+COPY zoo_build_knowledge.py .
+COPY zoo_sources.py .
+COPY utils ./utils
+
+# Install additional dependencies for knowledge base building
+RUN pip install --no-cache-dir docling docling-core
+
 # Copy built frontend static files
 # These will be served by FastAPI using StaticFiles middleware
 COPY apps/web/dist ./static
+
+# Copy entrypoint script
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Create data directory for LanceDB and SQLite
 RUN mkdir -p /app/data && chown -R zoocari:zoocari /app/data
@@ -74,9 +86,9 @@ USER zoocari
 # Expose API port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+# Health check (with longer start period for knowledge base build)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=600s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Production command (no reload)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# Use entrypoint for conditional knowledge base initialization
+ENTRYPOINT ["/entrypoint.sh"]

@@ -195,7 +195,7 @@ export default function ChatInterface() {
       {audioBlob && (
         <div className="px-6 py-3">
           <Suspense fallback={<div className="text-center text-gray-500">Loading audio player...</div>}>
-            <AudioPlayer audioBlob={audioBlob} autoPlay={false} />
+            <AudioPlayer audioBlob={audioBlob} autoPlay={true} />
           </Suspense>
         </div>
       )}
