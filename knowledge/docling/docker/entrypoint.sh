@@ -18,8 +18,7 @@ if [ ! -d "$LANCEDB_DIR" ] || [ -z "$(ls -A $LANCEDB_DIR 2>/dev/null)" ]; then
     fi
 
     # Run knowledge base builder
-    cd /app
-    python zoo_build_knowledge.py
+    python /app/zoo_build_knowledge.py
 
     echo "=============================================="
     echo "Knowledge base built successfully!"

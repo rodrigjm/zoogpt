@@ -69,8 +69,10 @@ WORKDIR /app
 COPY apps/api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy pre-downloaded models from builder stage
-COPY --from=builder /root/.cache /root/.cache
+# Copy pre-downloaded models from builder stage to zoocari user's home
+# Models must be accessible by the non-root user
+COPY --from=builder /root/.cache /home/zoocari/.cache
+RUN chown -R zoocari:zoocari /home/zoocari/.cache
 
 # Copy application code
 COPY apps/api/app ./app
@@ -97,6 +99,7 @@ RUN mkdir -p /app/data && chown -R zoocari:zoocari /app/data
 
 # Switch to non-root user
 USER zoocari
+ENV HOME=/home/zoocari
 
 # Expose API port
 EXPOSE 8000
