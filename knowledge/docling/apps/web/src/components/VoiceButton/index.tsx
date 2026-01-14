@@ -64,9 +64,11 @@ export default function VoiceButton({
       try {
         const audioBlob = await stopRecording();
         if (audioBlob) {
+          // Convert Blob to File for type safety with FormData
+          const audioFile = new File([audioBlob], 'recording.webm', { type: audioBlob.type });
           const response = await speechToText({
             session_id: sessionId,
-            audio: audioBlob,
+            audio: audioFile,
           });
           onTranscript(response.text);
         }
@@ -91,6 +93,19 @@ export default function VoiceButton({
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getAriaLabel = (): string => {
+    switch (buttonState) {
+      case 'idle':
+        return 'Start recording';
+      case 'recording':
+        return 'Stop recording';
+      case 'preparing':
+        return 'Preparing microphone';
+      case 'processing':
+        return 'Processing audio';
+    }
   };
 
   // Visual states
@@ -198,13 +213,7 @@ export default function VoiceButton({
         onClick={handleClick}
         disabled={disabled || buttonState === 'preparing' || buttonState === 'processing'}
         className={getButtonClasses()}
-        aria-label={
-          buttonState === 'idle'
-            ? 'Start recording'
-            : buttonState === 'recording'
-            ? 'Stop recording'
-            : buttonState
-        }
+        aria-label={getAriaLabel()}
         aria-busy={buttonState === 'processing' || buttonState === 'preparing'}
       >
         {renderIcon()}

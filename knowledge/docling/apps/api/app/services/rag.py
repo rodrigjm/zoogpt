@@ -105,18 +105,14 @@ class RAGService:
         distances = []
 
         for row in results:
-            # Extract metadata
-            metadata = row.get("metadata", {})
-            if metadata is None:
+            # Extract metadata with safe defaults
+            metadata = row.get("metadata") or {}
+            if not isinstance(metadata, dict):
                 metadata = {}
 
-            animal_name = (
-                metadata.get("animal_name", "Unknown")
-                if isinstance(metadata, dict)
-                else "Unknown"
-            )
-            title = metadata.get("title", "") if isinstance(metadata, dict) else ""
-            url = metadata.get("url", "") if isinstance(metadata, dict) else ""
+            animal_name = metadata.get("animal_name", "Unknown")
+            title = metadata.get("title", "")
+            url = metadata.get("url", "")
 
             # Build source object
             sources.append({"animal": animal_name, "title": title, "url": url})

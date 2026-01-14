@@ -3,12 +3,14 @@ Voice (STT/TTS) router.
 Per CONTRACT.md Part 4: Voice.
 """
 
+import base64
+import json
+import logging
+import re
+from typing import Annotated
+
 from fastapi import APIRouter, File, Form, UploadFile, status
 from fastapi.responses import JSONResponse, Response
-from typing import Annotated
-import logging
-import base64
-import re
 from sse_starlette.sse import EventSourceResponse
 
 from ..models import STTResponse, TTSRequest, ErrorResponse
@@ -224,7 +226,6 @@ async def text_to_speech(body: TTSRequest):
     )
 
 
-
 @router.post(
     "/tts/stream",
     status_code=status.HTTP_200_OK,
@@ -267,8 +268,6 @@ async def tts_stream(body: TTSStreamRequest):
 
     async def generate_audio_stream():
         """Generator that yields SSE events with audio chunks."""
-        import json
-        
         buffer = ""
         sentence_index = 0
         
