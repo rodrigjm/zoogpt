@@ -7,7 +7,7 @@ import re
 import lancedb
 from openai import OpenAI
 
-from ..config import settings
+from ..config import settings, dynamic_config
 from ..utils.timing import timed_print
 
 
@@ -73,45 +73,8 @@ def get_fallback_questions(count: int = 3) -> list[str]:
     return questions
 
 
-# Zoocari system prompt - ported from legacy/zoo_chat.py
-ZUCARI_SYSTEM_PROMPT = """You are Zoocari the Elephant, the friendly animal expert at Leesburg Animal Park! You LOVE helping kids learn about all the amazing animals they can meet at the park!
-
-YOUR PERSONALITY:
-- You're warm, playful, and encouraging - like a fun zoo guide!
-- You use simple words that 6-12 year olds understand
-- You show genuine excitement about animal facts
-- You speak like a fun friend, not a boring textbook
-- You occasionally make gentle elephant sounds like "Ooh!" or trumpet sounds
-- You sometimes mention that kids can see these animals at Leesburg Animal Park!
-
-CRITICAL RULES (YOU MUST FOLLOW THESE):
-1. ONLY answer questions using information from the CONTEXT provided below
-2. If the context doesn't contain information to answer the question, say: "Hmm, I don't know about that yet! Maybe ask one of the zookeepers when you visit Leesburg Animal Park, or check out a book from your library!"
-3. NEVER make up facts or guess - kids trust you!
-4. Keep answers short (1-2 short paragraphs max) - keep under 100 words
-5. Use age-appropriate language - no complex scientific terms without explanation
-6. Handle nature's realities gently (predators hunt, but no graphic details or inappropriate content/language)
-
-RESPONSE FORMAT:
-1. Start with an enthusiastic greeting related to the question
-2. Give your answer based ONLY on the context
-3. End with exactly 3 follow-up questions in this format:
-4. no emojis in response or follow up questions
-
-**Want to explore more? Here are some fun questions to ask me:**
-1. [First follow-up question]
-2. [Second follow-up question]
-3. [Third follow-up question]
-
-The follow-up questions should:
-- Be related to what you just talked about
-- Be things kids would find interesting
-- Be about interesting animal facts or behaviors
-
-CONTEXT (Use ONLY this information to answer):
-{context}
-
-Remember: You're Zoocari the Elephant at Leesburg Animal Park! Be fun, be accurate, and help kids fall in love with learning about animals!"""
+# Note: System prompt is now loaded dynamically from admin_config.json
+# via dynamic_config.system_prompt
 
 
 class RAGService:
@@ -209,8 +172,8 @@ class RAGService:
         Returns:
             Generated response string
         """
-        # Build system prompt with context
-        system_prompt = ZUCARI_SYSTEM_PROMPT.format(context=context)
+        # Build system prompt with context (loaded dynamically)
+        system_prompt = dynamic_config.system_prompt.format(context=context)
 
         # Prepend system message
         messages_with_context = [
@@ -218,12 +181,14 @@ class RAGService:
             *messages,
         ]
 
-        # Generate response (non-streaming)
-        timed_print("  [RAG] OpenAI API call starting (gpt-4o-mini)")
+        # Generate response (non-streaming) with dynamic model settings
+        model_name = dynamic_config.model_name
+        timed_print(f"  [RAG] OpenAI API call starting ({model_name})")
         response = self.openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model_name,
             messages=messages_with_context,
-            temperature=0.7,
+            temperature=dynamic_config.model_temperature,
+            max_tokens=dynamic_config.model_max_tokens,
         )
         timed_print(f"  [RAG] OpenAI API response received ({len(response.choices[0].message.content)} chars)")
 
@@ -240,8 +205,8 @@ class RAGService:
         Yields:
             Text chunks from OpenAI streaming response
         """
-        # Build system prompt with context
-        system_prompt = ZUCARI_SYSTEM_PROMPT.format(context=context)
+        # Build system prompt with context (loaded dynamically)
+        system_prompt = dynamic_config.system_prompt.format(context=context)
 
         # Prepend system message
         messages_with_context = [
@@ -249,12 +214,14 @@ class RAGService:
             *messages,
         ]
 
-        # Generate streaming response
-        timed_print("  [RAG] OpenAI streaming API call starting (gpt-4o-mini)")
+        # Generate streaming response with dynamic model settings
+        model_name = dynamic_config.model_name
+        timed_print(f"  [RAG] OpenAI streaming API call starting ({model_name})")
         stream = self.openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model=model_name,
             messages=messages_with_context,
-            temperature=0.7,
+            temperature=dynamic_config.model_temperature,
+            max_tokens=dynamic_config.model_max_tokens,
             stream=True,
         )
 

@@ -15,6 +15,7 @@ import numpy as np
 import soundfile as sf
 from openai import OpenAI
 
+from ..config import dynamic_config
 from ..utils.timing import timed_print
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,8 @@ VOICE_PRESETS = {
     "default": "af_heart",    # Default voice
 }
 
-DEFAULT_VOICE = "af_heart"
+# Note: Default voice is now loaded dynamically from admin_config.json
+# via dynamic_config.tts_default_voice
 
 
 def get_kokoro_pipeline():
@@ -180,7 +182,7 @@ class TTSService:
     Uses Kokoro locally when available, falls back to OpenAI API.
     """
 
-    def __init__(self, openai_api_key: str, default_voice: str = DEFAULT_VOICE):
+    def __init__(self, openai_api_key: str, default_voice: str = dynamic_config.tts_default_voice):
         """
         Initialize TTS service.
 
@@ -194,7 +196,7 @@ class TTSService:
     def synthesize_kokoro(
         self,
         text: str,
-        voice: str = DEFAULT_VOICE,
+        voice: str = dynamic_config.tts_default_voice,
         speed: float = 1.0,
         chunk_long_text: bool = True
     ) -> bytes:
@@ -306,7 +308,7 @@ class TTSService:
     def synthesize(
         self,
         text: str,
-        voice: str = DEFAULT_VOICE,
+        voice: str = dynamic_config.tts_default_voice,
         speed: float = 1.0
     ) -> bytes:
         """

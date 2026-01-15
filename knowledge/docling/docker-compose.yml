@@ -5,67 +5,72 @@
 # Quick Start:
 #   docker compose up --build
 #
-# Environment Variables (set in .env or pass directly):
+# With Admin Portal:
+#   docker compose --profile admin up --build
+#
+# Environment Variables (set in .env):
 #   - OPENAI_API_KEY (required): OpenAI API key for chat & STT
-#   - ELEVENLABS_API_KEY (optional): Fallback TTS provider
-#   - TTS_VOICE (optional): Kokoro voice ID (default: af_heart)
+#   - ADMIN_USERNAME/PASSWORD: Admin portal credentials
 #
 # ============================================================
 
 services:
-  zoocari:
+  # ============================================================
+  # Main API - FastAPI Backend
+  # ============================================================
+  api:
     build:
-      context: .
+      context: ./apps/api
       dockerfile: Dockerfile
-    container_name: zoocari-app
+    container_name: zoocari-api
     ports:
-      - "8501:8501"
-
+      - "8000:8000"
     volumes:
-      # Persist vector database between container restarts
+      # Persist data (LanceDB, sessions, config)
       - ./data:/app/data
-
-      # Persist Hugging Face model cache (Kokoro, spaCy models)
-      # This prevents re-downloading models on container restart
-      - zoocari-hf-cache:/app/.cache/huggingface
-
-      # Persist PyTorch cache
-      - zoocari-torch-cache:/app/.cache/torch
-
+      # Persist model cache (Kokoro, Whisper)
+      - zoocari-hf-cache:/root/.cache/huggingface
+      - zoocari-torch-cache:/root/.cache/torch
     environment:
-      # Required
       - OPENAI_API_KEY=${OPENAI_API_KEY:?OPENAI_API_KEY is required}
-
-      # Optional: ElevenLabs fallback TTS
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
-
-      # TTS Configuration (openai is fastest for Docker, kokoro only for native/GPU)
-      - TTS_VOICE=${TTS_VOICE:-nova}
-      - TTS_PROVIDER=${TTS_PROVIDER:-openai}
-
-      # Python settings for unbuffered logging
+      - TTS_PROVIDER=${TTS_PROVIDER:-kokoro}
+      - TTS_VOICE=${TTS_VOICE:-af_heart}
+      - STT_PROVIDER=${STT_PROVIDER:-faster-whisper}
+      - LANCEDB_PATH=/app/data/zoo_lancedb
+      - SESSION_DB_PATH=/app/data/sessions.db
       - PYTHONUNBUFFERED=1
-
-      # Hugging Face cache location
-      - HF_HOME=/app/.cache/huggingface
-      - TORCH_HOME=/app/.cache/torch
-
+      - HF_HOME=/root/.cache/huggingface
+      - TORCH_HOME=/root/.cache/torch
     env_file:
       - path: .env
         required: false
-
-    # Restart policy
     restart: unless-stopped
-
-    # Resource limits (adjust based on your hardware)
     deploy:
       resources:
         limits:
           memory: 4G
         reservations:
           memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-    # Logging configuration
+  # ============================================================
+  # Web Frontend - React/Vite
+  # ============================================================
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: zoocari-web
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+    restart: unless-stopped
     logging:
       driver: "json-file"
       options:
@@ -75,14 +80,6 @@ services:
   # ============================================================
   # Cloudflare Tunnel (HTTPS for mobile voice support)
   # ============================================================
-  # Provides secure HTTPS access required for browser microphone API.
-  # See CLOUDFLARE_TUNNEL_SETUP.md for configuration steps.
-  #
-  # Prerequisites:
-  #   1. Create tunnel: cloudflared tunnel create zoocari
-  #   2. Add credentials.json to ./cloudflare/
-  #   3. Set CLOUDFLARE_TUNNEL_TOKEN in .env (or use credentials file)
-  # ============================================================
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: zoocari-tunnel
@@ -91,18 +88,14 @@ services:
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
     volumes:
-      # Mount tunnel credentials and config
       - ./cloudflare:/etc/cloudflared:ro
     depends_on:
-      - zoocari
+      - api
     profiles:
-      - tunnel  # Only start with: docker compose --profile tunnel up
+      - tunnel
 
   # ============================================================
   # Admin Portal - API Backend
-  # ============================================================
-  # Provides analytics, KB management, and configuration APIs.
-  # Shares data volume with main zoocari app.
   # ============================================================
   admin-api:
     build:
@@ -110,28 +103,26 @@ services:
       dockerfile: Dockerfile
     container_name: zoocari-admin-api
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
-      # Share data directory with main app (SQLite DB, LanceDB, config)
       - ./data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
-      # Admin credentials (override in .env)
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-zoocari-admin}
       - JWT_SECRET=${JWT_SECRET:-zoocari-jwt-secret-change-in-production}
-      # Data paths
       - SESSION_DB_PATH=/app/data/sessions.db
       - LANCEDB_PATH=/app/data/zoo_lancedb
-      - CONFIG_PATH=/app/data/config.json
+      - CONFIG_PATH=/app/data/admin_config.json
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     env_file:
       - path: .env
         required: false
     depends_on:
-      - zoocari
+      - api
     restart: unless-stopped
     profiles:
-      - admin  # Start with: docker compose --profile admin up
+      - admin
     logging:
       driver: "json-file"
       options:
@@ -141,20 +132,18 @@ services:
   # ============================================================
   # Admin Portal - React Frontend
   # ============================================================
-  # SPA dashboard served via nginx, proxies API to admin-api.
-  # ============================================================
   admin-web:
     build:
       context: ./apps/admin
       dockerfile: Dockerfile
     container_name: zoocari-admin-web
     ports:
-      - "8502:80"
+      - "3001:80"
     depends_on:
       - admin-api
     restart: unless-stopped
     profiles:
-      - admin  # Start with: docker compose --profile admin up
+      - admin
     logging:
       driver: "json-file"
       options:

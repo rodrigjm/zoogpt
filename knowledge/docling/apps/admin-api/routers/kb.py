@@ -25,6 +25,7 @@ from models.kb import (
     IndexStatus,
     IndexRebuildResponse,
 )
+from services.indexer import IndexerService
 
 
 router = APIRouter(prefix="/kb", tags=["knowledge-base"])
@@ -505,7 +506,7 @@ async def run_index_rebuild(job_id: str):
     """
     Background task to rebuild the vector index.
 
-    TODO: Implement actual indexing logic:
+    Steps:
     1. Read all sources from kb_sources
     2. Chunk text
     3. Generate embeddings via OpenAI
@@ -515,19 +516,21 @@ async def run_index_rebuild(job_id: str):
     try:
         cursor = conn.cursor()
 
-        # Simulate indexing (replace with actual implementation)
-        import time
-        time.sleep(2)  # Simulate work
+        # Initialize indexer service
+        indexer = IndexerService(conn)
+
+        # Run the rebuild process
+        total_documents, total_chunks = indexer.rebuild_index()
 
         # Update job status
         cursor.execute(
             """UPDATE kb_index_history
                SET status = 'completed',
                    completed_at = CURRENT_TIMESTAMP,
-                   total_documents = 0,
-                   total_chunks = 0
+                   total_documents = ?,
+                   total_chunks = ?
                WHERE job_id = ?""",
-            (job_id,),
+            (total_documents, total_chunks, job_id),
         )
         conn.commit()
     except Exception as e:

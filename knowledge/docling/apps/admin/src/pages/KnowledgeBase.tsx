@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { kbApi } from '../api/client'
 import type { Animal, IndexStatus } from '../types'
+import { AnimalModal, DeleteConfirmModal, SourcesPanel } from '../components/KnowledgeBase'
 
 export default function KnowledgeBase() {
   const [animals, setAnimals] = useState<Animal[]>([])
@@ -9,23 +10,34 @@ export default function KnowledgeBase() {
   const [error, setError] = useState<string | null>(null)
   const [isRebuilding, setIsRebuilding] = useState(false)
 
+  // Modal states
+  const [isAnimalModalOpen, setIsAnimalModalOpen] = useState(false)
+  const [editingAnimal, setEditingAnimal] = useState<Animal | null>(null)
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [deletingAnimal, setDeletingAnimal] = useState<Animal | null>(null)
+  const [isSourcesPanelOpen, setIsSourcesPanelOpen] = useState(false)
+  const [selectedAnimalId, setSelectedAnimalId] = useState<number | null>(null)
+  const [selectedAnimalName, setSelectedAnimalName] = useState('')
+
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [animalsData, statusData] = await Promise.all([
-          kbApi.getAnimals({ limit: 100 }),
-          kbApi.getIndexStatus(),
-        ])
-        setAnimals(animalsData.animals)
-        setIndexStatus(statusData)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load knowledge base')
-      } finally {
-        setIsLoading(false)
-      }
-    }
     fetchData()
   }, [])
+
+  async function fetchData() {
+    try {
+      const [animalsData, statusData] = await Promise.all([
+        kbApi.getAnimals({ limit: 100 }),
+        kbApi.getIndexStatus(),
+      ])
+      setAnimals(animalsData.animals)
+      setIndexStatus(statusData)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load knowledge base')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleRebuildIndex = async () => {
     setIsRebuilding(true)
@@ -38,6 +50,43 @@ export default function KnowledgeBase() {
       setError(err instanceof Error ? err.message : 'Failed to start rebuild')
     } finally {
       setIsRebuilding(false)
+    }
+  }
+
+  const handleAddAnimal = () => {
+    setEditingAnimal(null)
+    setIsAnimalModalOpen(true)
+  }
+
+  const handleEditAnimal = (animal: Animal) => {
+    setEditingAnimal(animal)
+    setIsAnimalModalOpen(true)
+  }
+
+  const handleDeleteAnimal = (animal: Animal) => {
+    setDeletingAnimal(animal)
+    setIsDeleteModalOpen(true)
+  }
+
+  const handleViewSources = (animal: Animal) => {
+    setSelectedAnimalId(animal.id)
+    setSelectedAnimalName(animal.display_name)
+    setIsSourcesPanelOpen(true)
+  }
+
+  const handleSaveAnimal = async (data: any) => {
+    if (editingAnimal) {
+      await kbApi.updateAnimal(editingAnimal.id, data)
+    } else {
+      await kbApi.createAnimal(data)
+    }
+    await fetchData()
+  }
+
+  const handleConfirmDelete = async () => {
+    if (deletingAnimal) {
+      await kbApi.deleteAnimal(deletingAnimal.id)
+      await fetchData()
     }
   }
 
@@ -106,7 +155,10 @@ export default function KnowledgeBase() {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="p-4 border-b flex justify-between items-center">
           <h3 className="font-medium">Animals ({animals.length})</h3>
-          <button className="text-sm text-primary-600 hover:text-primary-700">
+          <button
+            onClick={handleAddAnimal}
+            className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+          >
             + Add Animal
           </button>
         </div>
@@ -133,14 +185,20 @@ export default function KnowledgeBase() {
           <tbody className="bg-white divide-y divide-gray-200">
             {animals.map((animal) => (
               <tr key={animal.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td
+                  className="px-6 py-4 whitespace-nowrap cursor-pointer"
+                  onClick={() => handleViewSources(animal)}
+                >
                   <p className="font-medium text-gray-900">{animal.display_name}</p>
                   <p className="text-sm text-gray-500">{animal.name}</p>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {animal.category || '-'}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td
+                  className="px-6 py-4 whitespace-nowrap text-sm text-primary-600 cursor-pointer hover:text-primary-700"
+                  onClick={() => handleViewSources(animal)}
+                >
                   {animal.source_count}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -155,10 +213,18 @@ export default function KnowledgeBase() {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <button className="text-primary-600 hover:text-primary-700 mr-3">
+                  <button
+                    onClick={() => handleEditAnimal(animal)}
+                    className="text-primary-600 hover:text-primary-700 mr-3"
+                  >
                     Edit
                   </button>
-                  <button className="text-red-600 hover:text-red-700">Delete</button>
+                  <button
+                    onClick={() => handleDeleteAnimal(animal)}
+                    className="text-red-600 hover:text-red-700"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}
@@ -172,6 +238,29 @@ export default function KnowledgeBase() {
           </tbody>
         </table>
       </div>
+
+      {/* Modals */}
+      <AnimalModal
+        isOpen={isAnimalModalOpen}
+        onClose={() => setIsAnimalModalOpen(false)}
+        onSave={handleSaveAnimal}
+        animal={editingAnimal}
+        existingNames={animals.map((a) => a.name.toLowerCase())}
+      />
+
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        animal={deletingAnimal}
+      />
+
+      <SourcesPanel
+        isOpen={isSourcesPanelOpen}
+        onClose={() => setIsSourcesPanelOpen(false)}
+        animalId={selectedAnimalId}
+        animalName={selectedAnimalName}
+      />
     </div>
   )
 }
