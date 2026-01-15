@@ -3,18 +3,43 @@ FastAPI main application entry point.
 Implements /health endpoint per CONTRACT.md Part 4.
 """
 
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .routers import session_router, chat_router, voice_router
+from .services.tts import preload_kokoro_pipeline
+from .services.analytics import get_analytics_service
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    App lifespan handler for startup/shutdown events.
+    Preloads Kokoro TTS model and initializes analytics.
+    """
+    # Startup
+    logger.info("Starting up Zoocari API...")
+    preload_kokoro_pipeline()
+    # Initialize analytics service (creates tables if needed)
+    get_analytics_service()
+    logger.info("Analytics service initialized")
+    yield
+    # Shutdown: cleanup if needed
+    logger.info("Shutting down Zoocari API...")
+
 
 # Create FastAPI app
 app = FastAPI(
     title="Zoocari API",
     description="Voice-first zoo Q&A chatbot backend",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # CORS middleware

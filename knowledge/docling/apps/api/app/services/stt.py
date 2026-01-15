@@ -14,6 +14,8 @@ from typing import Optional
 
 from openai import OpenAI
 
+from ..utils.timing import timed_print
+
 logger = logging.getLogger(__name__)
 
 # Global lazy-loaded model
@@ -93,9 +95,10 @@ class STTService:
             temp_path = f.name
 
         try:
+            timed_print("  [STT] Faster-Whisper transcribing...")
             segments, _ = model.transcribe(temp_path, language="en")
             text = " ".join([seg.text for seg in segments]).strip()
-            logger.info(f"[STT] Faster-Whisper transcribed: {len(text)} chars")
+            timed_print(f"  [STT] Faster-Whisper done: '{text[:30]}...' ({len(text)} chars)")
             return text
         finally:
             # Clean up temp file
@@ -176,14 +179,14 @@ class STTService:
         audio_file = io.BytesIO(audio_bytes)
         # Use correct extension so OpenAI can decode properly
         audio_file.name = f"recording.{audio_format}"
-        logger.info(f"[STT] Sending {audio_format} audio to OpenAI Whisper")
+        timed_print(f"  [STT] OpenAI Whisper API call starting ({audio_format})...")
 
         transcription = self.openai_client.audio.transcriptions.create(
             model="whisper-1",
             file=audio_file,
             language="en",
         )
-        logger.info(f"[STT] OpenAI Whisper transcribed: {len(transcription.text)} chars")
+        timed_print(f"  [STT] OpenAI Whisper done: '{transcription.text[:30]}...' ({len(transcription.text)} chars)")
         return transcription.text
 
     def transcribe(self, audio_bytes: bytes) -> str:

@@ -13,6 +13,7 @@ Implement/adjust FastAPI endpoints per `docs/integration/CONTRACT.md`.
 ## Scope (read/write)
 - Allowed:
   - `apps/api/**`
+  - `apps/admin-api/**`
   - `docs/integration/**`
 - Read-only (if needed):
   - `*.py`

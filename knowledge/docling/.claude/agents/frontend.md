@@ -13,6 +13,7 @@ Implement UI and client logic that strictly matches `docs/integration/CONTRACT.m
 ## Scope (read/write)
 - Allowed:
   - `apps/web/**`
+  - `apps/admin/**`
   - `docs/integration/**`
 - Read-only (if needed):
   - `apps/api/app/models/**` (DTO alignment only)

@@ -8,6 +8,69 @@ import lancedb
 from openai import OpenAI
 
 from ..config import settings
+from ..utils.timing import timed_print
+
+
+# Fallback follow-up questions for when LLM doesn't provide any
+# Rotates through these 30 kid-friendly zoo questions
+FALLBACK_FOLLOWUP_QUESTIONS = [
+    "What do lions like to eat?",
+    "How fast can a cheetah run?",
+    "Why do zebras have stripes?",
+    "What sounds do elephants make?",
+    "How long do giraffes sleep?",
+    "What do monkeys eat for breakfast?",
+    "Can camels really store water in their humps?",
+    "Why do flamingos stand on one leg?",
+    "How do penguins stay warm?",
+    "What's the biggest animal at the zoo?",
+    "Do snakes have bones?",
+    "Why do owls come out at night?",
+    "How do chameleons change color?",
+    "What do baby animals eat?",
+    "Can parrots really talk?",
+    "How strong is a gorilla?",
+    "What do tortoises eat?",
+    "Why do peacocks have colorful feathers?",
+    "How do animals stay cool in summer?",
+    "What's the fastest bird?",
+    "Do all bears hibernate?",
+    "How do kangaroos carry their babies?",
+    "What do lemurs like to do for fun?",
+    "Why do wolves howl at the moon?",
+    "How do otters sleep in the water?",
+    "What's special about a tiger's stripes?",
+    "Do hippos really swim?",
+    "What do porcupines eat?",
+    "How do meerkats warn each other of danger?",
+    "What animals can you pet at Leesburg Animal Park?",
+]
+
+# Counter for rotating through fallback questions
+_fallback_question_index = 0
+
+
+def get_fallback_questions(count: int = 3) -> list[str]:
+    """
+    Get the next set of fallback follow-up questions.
+    Rotates through the pool to provide variety.
+
+    Args:
+        count: Number of questions to return (default 3)
+
+    Returns:
+        List of fallback questions
+    """
+    global _fallback_question_index
+    questions = []
+    pool_size = len(FALLBACK_FOLLOWUP_QUESTIONS)
+
+    for _ in range(count):
+        questions.append(FALLBACK_FOLLOWUP_QUESTIONS[_fallback_question_index])
+        _fallback_question_index = (_fallback_question_index + 1) % pool_size
+
+    timed_print(f"  [RAG] Using {count} fallback follow-up questions")
+    return questions
 
 
 # Zoocari system prompt - ported from legacy/zoo_chat.py
@@ -98,7 +161,9 @@ class RAGService:
             Tuple of (context_string, sources_list, confidence_score)
         """
         # Search the table (using to_list() to avoid pandas dependency)
+        timed_print(f"  [RAG] LanceDB query: '{query[:40]}...'")
         results = self.table.search(query).limit(num_results).to_list()
+        timed_print(f"  [RAG] LanceDB returned {len(results)} results")
 
         contexts = []
         sources = []
@@ -154,11 +219,13 @@ class RAGService:
         ]
 
         # Generate response (non-streaming)
+        timed_print("  [RAG] OpenAI API call starting (gpt-4o-mini)")
         response = self.openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages_with_context,
             temperature=0.7,
         )
+        timed_print(f"  [RAG] OpenAI API response received ({len(response.choices[0].message.content)} chars)")
 
         return response.choices[0].message.content
 
@@ -183,6 +250,7 @@ class RAGService:
         ]
 
         # Generate streaming response
+        timed_print("  [RAG] OpenAI streaming API call starting (gpt-4o-mini)")
         stream = self.openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages_with_context,
@@ -191,9 +259,14 @@ class RAGService:
         )
 
         # Yield text chunks
+        first_chunk = True
         for chunk in stream:
             if chunk.choices[0].delta.content is not None:
+                if first_chunk:
+                    timed_print("  [RAG] OpenAI first streaming chunk received")
+                    first_chunk = False
                 yield chunk.choices[0].delta.content
+        timed_print("  [RAG] OpenAI streaming complete")
 
     def extract_followup_questions(self, response: str) -> tuple[str, list[str]]:
         """
@@ -205,19 +278,42 @@ class RAGService:
         Returns:
             Tuple of (main_response, list_of_questions)
         """
-        # Pattern to find the follow-up section
-        pattern = r'\*\*Want to explore more\?.*?\*\*\s*\n((?:\d+\.\s+.+\n?)+)'
-        match = re.search(pattern, response, re.IGNORECASE)
+        # Try multiple patterns to handle LLM format variations
+        # Pattern 1: Bold header with questions on following lines
+        # Pattern 2: Just the text without bold markers
+        # Pattern 3: Questions might be on same line or following lines
+        patterns = [
+            # **Want to explore more? ...**\n1. question
+            r'\*\*Want to explore more\?[^*]*\*\*\s*\n?((?:\d+\.\s+.+(?:\n|$))+)',
+            # Want to explore more? (without bold)
+            r'Want to explore more\?[^\n]*\n((?:\d+\.\s+.+(?:\n|$))+)',
+            # Any numbered list after "explore more" or "questions to ask"
+            r'(?:explore more|questions to ask)[^\n]*\n((?:\d+\.\s+.+(?:\n|$))+)',
+        ]
 
-        if match:
-            # Extract the questions part
-            questions_text = match.group(1)
-            # Parse individual questions
-            questions = re.findall(r'\d+\.\s+(.+?)(?:\n|$)', questions_text)
-            questions = [q.strip().rstrip('?') + '?' for q in questions if q.strip()]
+        for i, pattern in enumerate(patterns):
+            match = re.search(pattern, response, re.IGNORECASE)
+            if match:
+                # Extract the questions part
+                questions_text = match.group(1)
+                # Parse individual questions
+                questions = re.findall(r'\d+\.\s+(.+?)(?:\n|$)', questions_text)
+                questions = [q.strip().rstrip('?') + '?' for q in questions if q.strip()]
 
-            # Get main response (everything before the follow-up section)
-            main_response = response[: match.start()].strip()
-            return main_response, questions
+                if questions:  # Only return if we actually found questions
+                    # Get main response (everything before the follow-up section)
+                    main_response = response[: match.start()].strip()
+                    timed_print(f"  [RAG] Extracted {len(questions)} follow-up questions (pattern {i+1})")
+                    return main_response, questions
 
-        return response, []
+        # Log when no follow-up questions found for debugging
+        if "want to explore" in response.lower() or "questions to ask" in response.lower():
+            timed_print(f"  [RAG] Warning: Follow-up section detected but pattern didn't match")
+            # Log last 200 chars for debugging
+            timed_print(f"  [RAG] Response tail: {response[-200:]!r}")
+        else:
+            timed_print("  [RAG] No follow-up questions section in response")
+
+        # Return fallback questions when LLM doesn't provide any
+        fallback = get_fallback_questions(3)
+        return response, fallback

@@ -49,6 +49,13 @@
 - 2026-01-12: **Task 6.3 (Deployment Scripts) completed.** Created 4 scripts in scripts/: deploy.sh (production deployment with auto-rollback), backup.sh (timestamped backups with cleanup), rollback-prod.sh (production rollback with backup restore), test-deployment.sh (pre-flight checks). All scripts executable with proper error handling, color-coded logging, health checks, and graceful shutdown (30s timeout). Backup features: SQLite backup using sqlite3 command, LanceDB backup (skip if >100MB), keep last N backups (default: 5). Deploy features: pre-flight checks (.env, Docker, OPENAI_API_KEY), automatic backup before deploy, health check wait (max 3.3 min), auto-rollback on failure, Cloudflare tunnel support (--profile cloudflare). Test suite: 19 tests passing (syntax validation, permissions, required files/directories, Docker availability, environment variables). Documentation: scripts/README.md with usage examples, common workflows, troubleshooting. Verification: ./scripts/test-deployment.sh (19/19 tests pass).
 - 2026-01-12: **Task 6.4 (Staging Validation) completed.** Created scripts/staging-validate.sh: tests all 8 endpoints (health, session create/retrieve, chat, chat/stream SSE, voice STT/TTS, response time <2s). Validates response shapes match CONTRACT.md. Created scripts/load-test.sh: concurrent request testing with configurable requests/concurrency, reports success/failure counts, latency metrics (min/avg/p50/p95/p99/max), throughput (req/s). Pass criteria: zero failures, avg <2000ms, p95 <5000ms (warn). Supports GNU parallel with background job fallback. Created docs/integration/STAGING_RESULTS.md template: deployment info, validation results, load test metrics, manual test cases, contract compliance checklist, issues tracking, browser/device compatibility, security checks, sign-off checklist, rollback plan. Updated scripts/README.md with staging validation section. All scripts executable with proper error handling.
 - 2026-01-12: **Task 6.5 (Production Cutover Documentation) completed.** Created docs/integration/PRODUCTION_RUNBOOK.md: comprehensive production cutover runbook (828 lines, 150 checklist items). Sections: pre-cutover checklist (environment/config/backup/communication/load testing), cutover procedure (12 detailed steps with commands and verification), post-cutover verification (1hr/4hr/24hr/48hr intervals), rollback procedure (automated + manual), monitoring & alerting (key metrics, log locations, useful commands), emergency contacts, command reference. Includes rollback triggers (error rate >5%, P95 >5s, crashes, data corruption), smoke test commands (6 critical paths), health check monitoring, resource limits. All commands tested and verified against existing scripts (deploy.sh, backup.sh, rollback.sh, staging-validate.sh, load-test.sh).
+- 2026-01-14: **Admin Portal Design completed.** Created docs/design/admin-portal-architecture.md: comprehensive architecture design for separate admin portal container. Features: analytics dashboard (Q&A pairs, session metrics, latency breakdown), knowledge base CRUD (animals/sources, vector index rebuild), prompt engineering (system prompt, model parameters), voice configuration (TTS provider/voice/speed). Tech stack: FastAPI backend + React SPA, shared data volume with main app. Created docs/design/admin-portal-implementation-plan.md with 5 phases.
+- 2026-01-14: **Admin Portal Phase 1.1 (Analytics Foundation) completed.** Created apps/api/app/models/analytics.py (Pydantic models: ChatInteraction, SessionMetrics, DailyAnalytics, DashboardMetrics, LatencyBreakdown). Created apps/api/app/services/analytics.py (AnalyticsService with SQLite schema: chat_interactions, session_metrics, daily_analytics tables). Enhanced apps/api/app/utils/timing.py with ComponentTimings dataclass and timer.component() context manager. Instrumented apps/api/app/routers/chat.py to record interactions with RAG/LLM timing. Instrumented apps/api/app/routers/voice.py to record TTS timing for /voice/tts and full interactions for /voice/tts/stream. Analytics service initialized at app startup in main.py.
+- 2026-01-14: **Admin Portal Phase 2 (Admin API & Dashboard) completed.**
+  - **Admin API Backend** (apps/admin-api/): FastAPI app with JWT authentication, analytics/KB/config routers. Endpoints: /api/admin/analytics/* (dashboard, sessions, interactions, latency), /api/admin/kb/* (animals CRUD, sources, index rebuild), /api/admin/config/* (prompts, model, TTS settings). Auth: HTTP Basic login → JWT token. Config: Pydantic Settings with shared data paths.
+  - **React Admin Frontend** (apps/admin/): Vite + React 18 + TypeScript + Tailwind CSS + Zustand. Pages: Login, Dashboard (with Recharts), Sessions, Interactions (Q&A search), KnowledgeBase (animal CRUD), Configuration (prompts/model/TTS). API client with auth headers. Layout with sidebar navigation.
+  - **Docker Integration**: apps/admin-api/Dockerfile (Python 3.12-slim, uvicorn), apps/admin/Dockerfile (Node.js build + nginx serve), apps/admin/nginx.conf (SPA routing + API proxy). docker-compose.yml updated with admin-api and admin-web services (--profile admin). Shared /app/data volume for SQLite DB, LanceDB, and config.json.
+  - **Deployment**: `docker compose --profile admin up` starts admin portal on :8502 (frontend) and :8000 (API). Default credentials: admin/zoocari-admin (override in .env).
 
 ## Missing Services (Priority)
 
@@ -291,3 +298,29 @@ Per migration.md acceptance criteria, the following services need actual impleme
     - FollowupQuestions buttons: Added min-h-11 (44px)
     - E2E tests: Replaced CSS :has-text() regex with getByRole for Playwright compatibility
     - E2E tests: Added waitForLoadState('networkidle') and switched to text mode before input tests
+
+---
+
+## Future Roadmap
+
+### Phase 7: Visual Enhancements
+
+| Feature | Description | Priority | Effort |
+|---------|-------------|----------|--------|
+| **Animal Images** | Display image of the animal being discussed in the chat response. Pull from zoo content database or external image API. Show alongside assistant messages when animal is mentioned. | High | 4-6 hrs |
+| **Talking Avatar (Zoocari)** | Animated Zoocari mascot with lip-sync to TTS audio responses. Use lip-sync library (e.g., rhubarb-lip-sync, Wav2Lip) or pre-rendered phoneme animations. Avatar speaks answers for more engaging kid experience. | Medium | 12-20 hrs |
+
+### Implementation Notes
+
+#### Animal Images
+- Source options: Local image assets, Unsplash API, or zoo-provided photos
+- Trigger: Extract animal name from RAG sources, display corresponding image
+- UI: Image thumbnail in MessageBubble or dedicated image panel
+
+#### Talking Avatar
+- Options:
+  1. **Pre-rendered sprites** - Simple phoneme-based animation (A, E, I, O, U + closed)
+  2. **Wav2Lip / SadTalker** - AI-driven lip-sync from audio (GPU required)
+  3. **Web animation** - CSS/Lottie animations synced to audio timestamps
+- Audio sync: Use Web Audio API to detect amplitude for simple mouth movement
+- Fallback: Static image with pulsing indicator during speech

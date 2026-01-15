@@ -15,6 +15,8 @@ import numpy as np
 import soundfile as sf
 from openai import OpenAI
 
+from ..utils.timing import timed_print
+
 logger = logging.getLogger(__name__)
 
 # Global lazy-loaded pipeline
@@ -65,6 +67,56 @@ def is_kokoro_available() -> bool:
     return get_kokoro_pipeline() is not None
 
 
+def preload_kokoro_pipeline() -> bool:
+    """
+    Preload the Kokoro pipeline at app startup.
+    Call this during FastAPI lifespan to avoid first-request latency.
+
+    Returns:
+        True if pipeline loaded successfully, False otherwise.
+    """
+    logger.info("[KOKORO] Preloading TTS model at startup...")
+    pipeline = get_kokoro_pipeline()
+    if pipeline is not None:
+        logger.info("[KOKORO] TTS model preloaded successfully")
+        return True
+    else:
+        logger.warning("[KOKORO] TTS model preload failed - will use OpenAI fallback")
+        return False
+
+
+def strip_followup_questions(text: str) -> str:
+    """
+    Remove follow-up questions section from response for TTS.
+
+    The follow-up questions section starts with "**Want to explore more?**"
+    and should not be read aloud.
+
+    Args:
+        text: Response text potentially containing follow-up questions
+
+    Returns:
+        Text with follow-up questions section removed
+    """
+    # Try multiple patterns to handle LLM format variations
+    patterns = [
+        # **Want to explore more?...** and everything after
+        r'\*\*Want to explore more\?.*',
+        # Want to explore more? (without bold) and everything after
+        r'Want to explore more\?.*',
+        # "questions to ask" section and everything after
+        r'Here are some.*questions to ask.*',
+    ]
+
+    result = text
+    for pattern in patterns:
+        new_result = re.sub(pattern, '', result, flags=re.DOTALL | re.IGNORECASE).strip()
+        if new_result != result:
+            return new_result
+
+    return result.strip()
+
+
 def strip_markdown(text: str) -> str:
     """
     Remove markdown formatting from text for TTS processing.
@@ -74,6 +126,7 @@ def strip_markdown(text: str) -> str:
     - Italic (*text*)
     - Headers (# ## ### etc.)
     - Links [text](url)
+    - Follow-up questions section
 
     Args:
         text: Text containing markdown formatting
@@ -82,6 +135,7 @@ def strip_markdown(text: str) -> str:
         Plain text with markdown removed
     """
     result = text
+    result = strip_followup_questions(result)  # Remove follow-up questions first
     result = re.sub(r'\*\*([^*]+)\*\*', r'\1', result)  # Remove bold
     result = re.sub(r'\*([^*]+)\*', r'\1', result)  # Remove italic
     result = re.sub(r'#{1,6}\s*', '', result)  # Remove headers
@@ -180,10 +234,13 @@ class TTSService:
             chunks = [clean_text]
 
         # Generate audio for each chunk
+        timed_print(f"  [TTS] Kokoro synthesizing {len(chunks)} chunk(s)...")
         all_audio = []
-        for chunk in chunks:
+        for i, chunk in enumerate(chunks):
             for _, _, audio in pipeline(chunk, voice=voice, speed=speed):
                 all_audio.append(audio)
+            if len(chunks) > 1:
+                timed_print(f"  [TTS] Kokoro chunk {i+1}/{len(chunks)} done")
 
         # Concatenate all audio chunks
         full_audio = np.concatenate(all_audio)
@@ -193,7 +250,7 @@ class TTSService:
         sf.write(buffer, full_audio, 24000, format='WAV')
         buffer.seek(0)
 
-        logger.info(f"[KOKORO] Generated {len(full_audio)} samples ({len(buffer.getvalue())} bytes)")
+        timed_print(f"  [TTS] Kokoro done: {len(full_audio)} samples, {len(buffer.getvalue())} bytes")
         return buffer.read()
 
     def synthesize_openai(
@@ -234,6 +291,7 @@ class TTSService:
         # OpenAI TTS has 4096 character limit
         truncated_text = clean_text[:4096]
 
+        timed_print(f"  [TTS] OpenAI API call starting (voice={openai_voice})...")
         with self.openai_client.audio.speech.with_streaming_response.create(
             model="tts-1",
             voice=openai_voice,
@@ -242,7 +300,7 @@ class TTSService:
         ) as response:
             audio_bytes = response.read()
 
-        logger.info(f"[OPENAI TTS] Generated {len(audio_bytes)} bytes")
+        timed_print(f"  [TTS] OpenAI done: {len(audio_bytes)} bytes")
         return audio_bytes
 
     def synthesize(

@@ -104,15 +104,15 @@ export default function ChatInterface() {
   return (
     <div className="flex flex-col h-full w-full max-w-5xl mx-auto">
       {/* Header with Mode Toggle */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white shadow-sm border-b-2 border-leesburg-beige">
-        <h1 className="text-3xl font-bold text-leesburg-brown">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 bg-white shadow-sm border-b-2 border-leesburg-beige">
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-leesburg-brown">
           Zoocari Chat
         </h1>
         <button
           onClick={toggleMode}
           disabled={isDisabled}
           className={`
-            px-4 py-2 rounded-full font-medium text-sm
+            px-3 sm:px-4 py-2 rounded-full font-medium text-xs sm:text-sm
             transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-leesburg-blue/30
             ${
               isDisabled
@@ -127,7 +127,7 @@ export default function ChatInterface() {
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 bg-gradient-to-b from-leesburg-beige/20 to-white">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-b from-leesburg-beige/20 to-white">
         {/* Show welcome message and animal grid if no messages */}
         {messages.length === 0 && !isStreaming && (
           <>
@@ -193,7 +193,7 @@ export default function ChatInterface() {
 
       {/* Audio Player */}
       {audioBlob && (
-        <div className="px-6 py-3">
+        <div className="px-4 sm:px-6 py-2 sm:py-3">
           <Suspense fallback={<div className="text-center text-gray-500">Loading audio player...</div>}>
             <AudioPlayer audioBlob={audioBlob} autoPlay={true} />
           </Suspense>
@@ -201,7 +201,7 @@ export default function ChatInterface() {
       )}
 
       {/* Input Area */}
-      <div className="px-6 py-4 bg-white border-t-2 border-leesburg-beige">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 bg-white border-t-2 border-leesburg-beige">
         {inputMode === 'voice' && sessionId ? (
           <div className="flex justify-center py-4">
             <VoiceButton

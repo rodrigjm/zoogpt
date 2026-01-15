@@ -7,6 +7,31 @@ import { create } from 'zustand';
 import type { ChatMessage, Source, StreamChunk } from '../types';
 import { sendChatMessage, streamChatMessage } from '../lib/api';
 
+/**
+ * Strip follow-up questions section from response text.
+ * Follow-up questions are displayed as buttons, not in the message text.
+ */
+function stripFollowupQuestions(text: string): string {
+  // Try multiple patterns to handle LLM format variations
+  const patterns = [
+    // **Want to explore more?...** and everything after
+    /\*\*Want to explore more\?.*$/is,
+    // Want to explore more? (without bold) and everything after
+    /Want to explore more\?.*$/is,
+    // "questions to ask" section and everything after
+    /Here are some.*questions to ask.*$/is,
+  ];
+
+  let result = text;
+  for (const pattern of patterns) {
+    const stripped = result.replace(pattern, '').trim();
+    if (stripped !== result) {
+      return stripped;
+    }
+  }
+  return result.trim();
+}
+
 interface ChatState {
   // State
   messages: ChatMessage[];
@@ -67,7 +92,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         message_id: response.message_id,
         session_id: response.session_id,
         role: 'assistant',
-        content: response.reply,
+        content: stripFollowupQuestions(response.reply),
         created_at: response.created_at,
       };
 
@@ -117,7 +142,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         (chunk: StreamChunk) => {
           if (chunk.type === 'text' && chunk.content) {
             streamedText += chunk.content;
-            set({ streamingContent: streamedText });
+            // Strip follow-up questions from displayed content during streaming
+            set({ streamingContent: stripFollowupQuestions(streamedText) });
           }
         },
         // onComplete
@@ -126,7 +152,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             message_id: `assistant-${Date.now()}`,
             session_id: sessionId,
             role: 'assistant',
-            content: streamedText,
+            content: stripFollowupQuestions(streamedText),
             created_at: new Date().toISOString(),
           };
 
