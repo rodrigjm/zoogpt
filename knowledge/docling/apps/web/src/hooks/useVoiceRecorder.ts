@@ -82,8 +82,9 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
         }
       };
 
-      // Start recording
-      mediaRecorder.start();
+      // Start recording - use timeslice to ensure data is flushed regularly
+      // 100ms timeslice for responsive capture of short recordings
+      mediaRecorder.start(100);
       startTimeRef.current = Date.now();
 
       // Start duration timer (update every 100ms)
@@ -145,6 +146,10 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
         resolve(blob);
       };
 
+      // Force flush any buffered data before stopping
+      if (mediaRecorder.state === 'recording') {
+        mediaRecorder.requestData();
+      }
       mediaRecorder.stop();
     });
   }, [getMimeType, cleanupTimer, cleanupStream]);

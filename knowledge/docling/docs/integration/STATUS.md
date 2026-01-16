@@ -23,6 +23,7 @@
 - [x] RAG source format + any citation expectations — **RESOLVED:** Sources return `[{"animal": "Lemur", "title": "Diet"}]`
 - [ ] **BLOCKER:** kokoro>=0.9.4 requires Python 3.10-3.12 but Python 3.14.2 is installed. Causes pip install failure in apps/api.
 - [x] **BLOCKER:** CORS config parsing error in docker. — **RESOLVED:** Added @field_validator to parse comma-separated CORS_ORIGINS env var in config.py.
+- [ ] **BUG:** STT voice transcription truncates sentences — audio chunks not flushed before MediaRecorder.stop(). See diagnosis below.
 
 ## Decisions Log
 - 2026-01-10: Phase 0 verification completed. All tasks pass except kokoro dependency.
@@ -57,6 +58,7 @@
   - **React Admin Frontend** (apps/admin/): Vite + React 18 + TypeScript + Tailwind CSS + Zustand. Pages: Login, Dashboard (with Recharts), Sessions, Interactions (Q&A search), KnowledgeBase (animal CRUD), Configuration (prompts/model/TTS). API client with auth headers. Layout with sidebar navigation.
   - **Docker Integration**: apps/admin-api/Dockerfile (Python 3.12-slim, uvicorn), apps/admin/Dockerfile (Node.js build + nginx serve), apps/admin/nginx.conf (SPA routing + API proxy). docker-compose.yml updated with admin-api and admin-web services (--profile admin). Shared /app/data volume for SQLite DB, LanceDB, and config.json.
   - **Deployment**: `docker compose --profile admin up` starts admin portal on :8502 (frontend) and :8000 (API). Default credentials: admin/zoocari-admin (override in .env).
+- 2026-01-15: **STT Truncation Bug Diagnosis completed.** Root cause: MediaRecorder.start() called without timeslice argument. Browser buffers audio chunks and only flushes to ondataavailable when buffer is full or stop() is called. Short recordings (<3 seconds) may not trigger ondataavailable before stop() completes, resulting in empty chunksRef array and 0-byte Blob. Fix: Pass timeslice argument (e.g., 1000ms) to mediaRecorder.start(1000) to force periodic data events. Location: apps/web/src/hooks/useVoiceRecorder.ts:86. Backend STT service correctly handles all audio formats and has no timeout issues.
 
 ## Missing Services (Priority)
 

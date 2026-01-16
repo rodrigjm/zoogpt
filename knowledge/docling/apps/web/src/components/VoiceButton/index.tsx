@@ -64,8 +64,9 @@ export default function VoiceButton({
       try {
         const audioBlob = await stopRecording();
         if (audioBlob) {
-          // Convert Blob to File for type safety with FormData
-          const audioFile = new File([audioBlob], 'recording.webm', { type: audioBlob.type });
+          // Convert Blob to File with correct extension based on MIME type
+          const ext = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
+          const audioFile = new File([audioBlob], `recording.${ext}`, { type: audioBlob.type });
           const response = await speechToText({
             session_id: sessionId,
             audio: audioFile,
