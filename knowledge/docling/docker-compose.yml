@@ -33,6 +33,8 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    networks:
+      - zoocari
     deploy:
       resources:
         limits:
@@ -65,6 +67,8 @@ services:
       timeout: 10s
       retries: 3
     restart: unless-stopped
+    networks:
+      - zoocari
     logging:
       driver: "json-file"
       options:
@@ -110,6 +114,8 @@ services:
       - ollama
       - kokoro-tts
     restart: unless-stopped
+    networks:
+      - zoocari
     deploy:
       resources:
         limits:
@@ -135,6 +141,8 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+    networks:
+      - zoocari
     logging:
       driver: "json-file"
       options:
@@ -155,6 +163,9 @@ services:
       - ./cloudflare:/etc/cloudflared:ro
     depends_on:
       - api
+      - web
+    networks:
+      - zoocari
     profiles:
       - tunnel
 
@@ -185,6 +196,8 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+    networks:
+      - zoocari
     profiles:
       - admin
     logging:
@@ -206,6 +219,8 @@ services:
     depends_on:
       - admin-api
     restart: unless-stopped
+    networks:
+      - zoocari
     profiles:
       - admin
     logging:
@@ -213,6 +228,11 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+# Shared network for all services
+networks:
+  zoocari:
+    name: zoocari-network
 
 # Named volumes for persistent model cache
 volumes:

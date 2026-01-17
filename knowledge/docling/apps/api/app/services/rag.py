@@ -1,15 +1,16 @@
 """
 RAG service for Zoocari chatbot.
-Implements LanceDB retrieval and OpenAI response generation.
+Implements LanceDB retrieval and LLM response generation (Ollama-first, OpenAI fallback).
 """
 
 import re
+import httpx
 import lancedb
 from openai import OpenAI
 
 from ..config import settings, dynamic_config
 from ..utils.timing import timed_print
-from .llm import LLMService
+from .llm import LLMService, is_ollama_available
 
 
 # Fallback follow-up questions for when LLM doesn't provide any
@@ -202,27 +203,57 @@ class RAGService:
 
         return response
 
-    def generate_response_stream(self, messages: list[dict], context: str):
+    def _stream_ollama(self, messages_with_context: list[dict]):
         """
-        Generate streaming response using OpenAI with Zoocari persona.
+        Stream response from Ollama.
 
         Args:
-            messages: Chat history in OpenAI format [{"role": "user", "content": "..."}]
-            context: Retrieved context from LanceDB
+            messages_with_context: Messages with system prompt
+
+        Yields:
+            Text chunks from Ollama streaming response
+        """
+        timed_print(f"  [RAG] Ollama streaming API call starting ({settings.ollama_model})")
+
+        with httpx.stream(
+            "POST",
+            f"{settings.ollama_url}/api/chat",
+            json={
+                "model": settings.ollama_model,
+                "messages": messages_with_context,
+                "stream": True,
+                "options": {
+                    "temperature": dynamic_config.model_temperature,
+                    "num_predict": dynamic_config.model_max_tokens
+                }
+            },
+            timeout=60.0
+        ) as response:
+            response.raise_for_status()
+            first_chunk = True
+            for line in response.iter_lines():
+                if line:
+                    import json
+                    data = json.loads(line)
+                    if "message" in data and "content" in data["message"]:
+                        content = data["message"]["content"]
+                        if content:
+                            if first_chunk:
+                                timed_print("  [RAG] Ollama first streaming chunk received")
+                                first_chunk = False
+                            yield content
+        timed_print("  [RAG] Ollama streaming complete")
+
+    def _stream_openai(self, messages_with_context: list[dict]):
+        """
+        Stream response from OpenAI.
+
+        Args:
+            messages_with_context: Messages with system prompt
 
         Yields:
             Text chunks from OpenAI streaming response
         """
-        # Build system prompt with context (loaded dynamically)
-        system_prompt = dynamic_config.system_prompt.format(context=context)
-
-        # Prepend system message
-        messages_with_context = [
-            {"role": "system", "content": system_prompt},
-            *messages,
-        ]
-
-        # Generate streaming response with dynamic model settings
         model_name = dynamic_config.model_name
         timed_print(f"  [RAG] OpenAI streaming API call starting ({model_name})")
         stream = self.openai_client.chat.completions.create(
@@ -233,7 +264,6 @@ class RAGService:
             stream=True,
         )
 
-        # Yield text chunks
         first_chunk = True
         for chunk in stream:
             if chunk.choices[0].delta.content is not None:
@@ -242,6 +272,39 @@ class RAGService:
                     first_chunk = False
                 yield chunk.choices[0].delta.content
         timed_print("  [RAG] OpenAI streaming complete")
+
+    def generate_response_stream(self, messages: list[dict], context: str):
+        """
+        Generate streaming response using LLM (Ollama-first, OpenAI fallback) with Zoocari persona.
+
+        Args:
+            messages: Chat history in OpenAI format [{"role": "user", "content": "..."}]
+            context: Retrieved context from LanceDB
+
+        Yields:
+            Text chunks from LLM streaming response
+        """
+        # Build system prompt with context (loaded dynamically)
+        system_prompt = dynamic_config.system_prompt.format(context=context)
+
+        # Prepend system message
+        messages_with_context = [
+            {"role": "system", "content": system_prompt},
+            *messages,
+        ]
+
+        # Try Ollama first if configured and available
+        if settings.llm_provider == "ollama" and is_ollama_available():
+            try:
+                timed_print(f"  [RAG] Using Ollama for streaming (provider: {settings.llm_provider})")
+                yield from self._stream_ollama(messages_with_context)
+                return
+            except Exception as e:
+                timed_print(f"  [RAG] Ollama streaming failed, falling back to OpenAI: {e}")
+
+        # Fallback to OpenAI
+        timed_print(f"  [RAG] Using OpenAI for streaming (provider: {settings.llm_provider})")
+        yield from self._stream_openai(messages_with_context)
 
     def extract_followup_questions(self, response: str) -> tuple[str, list[str]]:
         """
