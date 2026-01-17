@@ -9,6 +9,7 @@ from openai import OpenAI
 
 from ..config import settings, dynamic_config
 from ..utils.timing import timed_print
+from .llm import LLMService
 
 
 # Fallback follow-up questions for when LLM doesn't provide any
@@ -88,6 +89,7 @@ class RAGService:
         self._db = None
         self._table = None
         self._openai_client = None
+        self._llm_service = None
 
     @property
     def db(self):
@@ -109,6 +111,13 @@ class RAGService:
         if self._openai_client is None:
             self._openai_client = OpenAI(api_key=settings.openai_api_key)
         return self._openai_client
+
+    @property
+    def llm_service(self) -> LLMService:
+        """Lazy-load LLM service."""
+        if self._llm_service is None:
+            self._llm_service = LLMService(openai_api_key=settings.openai_api_key)
+        return self._llm_service
 
     def search_context(
         self, query: str, num_results: int = 5
@@ -163,7 +172,7 @@ class RAGService:
 
     def generate_response(self, messages: list[dict], context: str) -> str:
         """
-        Generate response using OpenAI with Zoocari persona.
+        Generate response using LLM (Ollama or OpenAI) with Zoocari persona.
 
         Args:
             messages: Chat history in OpenAI format [{"role": "user", "content": "..."}]
@@ -181,18 +190,17 @@ class RAGService:
             *messages,
         ]
 
-        # Generate response (non-streaming) with dynamic model settings
-        model_name = dynamic_config.model_name
-        timed_print(f"  [RAG] OpenAI API call starting ({model_name})")
-        response = self.openai_client.chat.completions.create(
-            model=model_name,
+        # Generate response using LLM service (local-first with cloud fallback)
+        timed_print(f"  [RAG] LLM generation starting (provider: {settings.llm_provider})")
+        response = self.llm_service.generate(
             messages=messages_with_context,
+            model=dynamic_config.model_name,
             temperature=dynamic_config.model_temperature,
             max_tokens=dynamic_config.model_max_tokens,
         )
-        timed_print(f"  [RAG] OpenAI API response received ({len(response.choices[0].message.content)} chars)")
+        timed_print(f"  [RAG] LLM generation complete ({len(response)} chars)")
 
-        return response.choices[0].message.content
+        return response
 
     def generate_response_stream(self, messages: list[dict], context: str):
         """

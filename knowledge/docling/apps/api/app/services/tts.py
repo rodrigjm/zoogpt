@@ -20,9 +20,9 @@ from ..utils.timing import timed_print
 
 logger = logging.getLogger(__name__)
 
-# Global lazy-loaded pipeline
-_kokoro_pipeline: Optional[object] = None
-_kokoro_pipeline_error: Optional[str] = None
+# Global lazy-loaded kokoro instance (kokoro-onnx)
+_kokoro_instance: Optional[object] = None
+_kokoro_instance_error: Optional[str] = None
 
 # Kid-friendly voice presets
 VOICE_PRESETS = {
@@ -39,47 +39,48 @@ VOICE_PRESETS = {
 # via dynamic_config.tts_default_voice
 
 
-def get_kokoro_pipeline():
+def get_kokoro_instance():
     """
-    Lazy-load and cache the Kokoro pipeline.
+    Lazy-load and cache the Kokoro-ONNX instance.
     Returns None if initialization fails.
     """
-    global _kokoro_pipeline, _kokoro_pipeline_error
+    global _kokoro_instance, _kokoro_instance_error
 
-    if _kokoro_pipeline_error:
-        logger.debug(f"[KOKORO] Pipeline previously failed: {_kokoro_pipeline_error}")
+    if _kokoro_instance_error:
+        logger.debug(f"[KOKORO] Instance previously failed: {_kokoro_instance_error}")
         return None
 
-    if _kokoro_pipeline is None:
+    if _kokoro_instance is None:
         try:
-            logger.info("[KOKORO] Initializing KPipeline...")
-            from kokoro import KPipeline
-            _kokoro_pipeline = KPipeline(lang_code='a')  # American English
-            logger.info("[KOKORO] Pipeline initialized successfully")
+            logger.info("[KOKORO] Initializing Kokoro-ONNX...")
+            from kokoro_onnx import Kokoro
+            # Note: Model paths can be auto-downloaded or specified
+            _kokoro_instance = Kokoro()  # Uses default model/voice paths
+            logger.info("[KOKORO] Kokoro-ONNX initialized successfully")
         except Exception as e:
-            _kokoro_pipeline_error = str(e)
-            logger.warning(f"[KOKORO] Pipeline initialization failed: {e}")
+            _kokoro_instance_error = str(e)
+            logger.warning(f"[KOKORO] Kokoro-ONNX initialization failed: {e}")
             return None
 
-    return _kokoro_pipeline
+    return _kokoro_instance
 
 
 def is_kokoro_available() -> bool:
     """Check if Kokoro TTS is available."""
-    return get_kokoro_pipeline() is not None
+    return get_kokoro_instance() is not None
 
 
-def preload_kokoro_pipeline() -> bool:
+def preload_kokoro_instance() -> bool:
     """
-    Preload the Kokoro pipeline at app startup.
+    Preload the Kokoro-ONNX instance at app startup.
     Call this during FastAPI lifespan to avoid first-request latency.
 
     Returns:
-        True if pipeline loaded successfully, False otherwise.
+        True if instance loaded successfully, False otherwise.
     """
     logger.info("[KOKORO] Preloading TTS model at startup...")
-    pipeline = get_kokoro_pipeline()
-    if pipeline is not None:
+    instance = get_kokoro_instance()
+    if instance is not None:
         logger.info("[KOKORO] TTS model preloaded successfully")
         return True
     else:
@@ -145,14 +146,14 @@ def strip_markdown(text: str) -> str:
     return result.strip()
 
 
-def chunk_text(text: str, max_chars: int = 800) -> list[str]:
+def chunk_text(text: str, max_chars: int = 300) -> list[str]:
     """
     Split text into optimal chunks for TTS.
-    Kokoro works best with 100-200 tokens (~500-1000 chars).
+    Reduced from 800 to 300 for lower time-to-first-audio.
 
     Args:
         text: Text to chunk
-        max_chars: Maximum characters per chunk
+        max_chars: Maximum characters per chunk (default: 300)
 
     Returns:
         List of text chunks
@@ -201,7 +202,7 @@ class TTSService:
         chunk_long_text: bool = True
     ) -> bytes:
         """
-        Generate speech using local Kokoro model.
+        Generate speech using local Kokoro-ONNX model.
 
         Args:
             text: Text to convert to speech
@@ -215,9 +216,9 @@ class TTSService:
         Raises:
             RuntimeError: If Kokoro is not available or fails
         """
-        pipeline = get_kokoro_pipeline()
-        if pipeline is None:
-            raise RuntimeError(f"Kokoro TTS not available: {_kokoro_pipeline_error}")
+        kokoro = get_kokoro_instance()
+        if kokoro is None:
+            raise RuntimeError(f"Kokoro TTS not available: {_kokoro_instance_error}")
 
         # Resolve voice preset if using shorthand
         if voice in VOICE_PRESETS:
@@ -229,20 +230,21 @@ class TTSService:
         if not clean_text:
             raise ValueError("No text to convert to speech")
 
-        # Chunk long text for better quality
-        if chunk_long_text and len(clean_text) > 800:
-            chunks = chunk_text(clean_text)
+        # Chunk long text for better quality (reduced threshold from 800 to 300)
+        if chunk_long_text and len(clean_text) > 300:
+            chunks = chunk_text(clean_text, max_chars=300)
         else:
             chunks = [clean_text]
 
-        # Generate audio for each chunk
-        timed_print(f"  [TTS] Kokoro synthesizing {len(chunks)} chunk(s)...")
+        # Generate audio for each chunk using kokoro-onnx
+        timed_print(f"  [TTS] Kokoro-ONNX synthesizing {len(chunks)} chunk(s)...")
         all_audio = []
         for i, chunk in enumerate(chunks):
-            for _, _, audio in pipeline(chunk, voice=voice, speed=speed):
-                all_audio.append(audio)
+            # kokoro-onnx API: create() returns (samples, sample_rate)
+            samples, sr = kokoro.create(chunk, voice=voice, speed=speed)
+            all_audio.append(samples)
             if len(chunks) > 1:
-                timed_print(f"  [TTS] Kokoro chunk {i+1}/{len(chunks)} done")
+                timed_print(f"  [TTS] Kokoro-ONNX chunk {i+1}/{len(chunks)} done")
 
         # Concatenate all audio chunks
         full_audio = np.concatenate(all_audio)
@@ -252,7 +254,7 @@ class TTSService:
         sf.write(buffer, full_audio, 24000, format='WAV')
         buffer.seek(0)
 
-        timed_print(f"  [TTS] Kokoro done: {len(full_audio)} samples, {len(buffer.getvalue())} bytes")
+        timed_print(f"  [TTS] Kokoro-ONNX done: {len(full_audio)} samples, {len(buffer.getvalue())} bytes")
         return buffer.read()
 
     def synthesize_openai(

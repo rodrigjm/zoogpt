@@ -1,82 +1,144 @@
+# Zoocari
 
-## Build & Run Commands
+Voice-first, kid-friendly zoo Q&A chatbot for Leesburg Animal Park.
 
-### Prerequisites
-- Python 3.12+ (required for Kokoro TTS compatibility)
-- espeak-ng system dependency: `brew install espeak-ng` (macOS) or `apt-get install espeak-ng` (Linux)
+## Quick Start
 
-### Local Development
 ```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Set up environment (copy .env.example to .env, add OPENAI_API_KEY)
+# 1. Clone and setup
+git clone https://github.com/rodrigjm/zoogpt.git
+cd zoogpt
 cp .env.example .env
+# Edit .env with your OPENAI_API_KEY
 
-# Build knowledge base (first time only, ~5-10 minutes)
-python zoo_build_knowledge.py
+# 2. Pull LLM models (one-time, ~7GB)
+docker compose up -d ollama
+docker compose exec ollama ollama pull phi4
+docker compose exec ollama ollama pull llama-guard3:1b
 
-# Run chatbot
-streamlit run zoo_chat.py
-```
+# 3. Start all services
+docker compose up -d
 
-### Docker Deployment
-```bash
-docker-compose up --build
-# Access at: http://localhost:8501
-```
-
-### Verification Commands
-```bash
-# Check Faster-Whisper STT availability
-python -c "from faster_whisper import WhisperModel; print('Faster-Whisper available')"
-
-# Check Kokoro TTS availability
-python -c "from tts_kokoro import is_kokoro_available; print(is_kokoro_available())"
-
-# Verify vector database row count
-python -c "import lancedb; db = lancedb.connect('data/zoo_lancedb'); print(db.open_table('animals').count_rows())"
+# 4. Open in browser
+open http://localhost:3000
 ```
 
 ## Architecture
 
-### Main Files
-- `zoo_chat.py` - Main Streamlit chatbot application with voice/text input
-- `zoo_build_knowledge.py` - Knowledge base builder using Docling + LanceDB
-- `zoo_sources.py` - Curated list of trusted animal education URLs
-- `tts_kokoro.py` - Local Kokoro TTS inference with cloud fallback chain
-- `utils/text.py` - Markdown stripping and HTML sanitization
-
-### Data Flow
-
-**Chat Pipeline:**
 ```
-User Input (voice/text) → STT (Faster-Whisper local / OpenAI fallback) → Vector Search (LanceDB) → LLM (GPT-4o-mini) → TTS → Audio Response
+┌─────────────────────────────────────────────────────────────┐
+│                      Docker Compose                          │
+├─────────────┬─────────────┬─────────────┬──────────────────┤
+│   web:3000  │  api:8000   │kokoro:8880  │  ollama:11434    │
+│   (React)   │  (FastAPI)  │   (TTS)     │ (Phi-4+Guard)    │
+└─────────────┴──────┬──────┴─────────────┴────────┬─────────┘
+                     │                              │
+                     └── Local-first, OpenAI fallback ──┘
 ```
 
-**Knowledge Build Pipeline:**
+| Service | Port | Purpose |
+|---------|------|---------|
+| **web** | 3000 | React frontend (voice UI) |
+| **api** | 8000 | FastAPI backend (RAG, safety) |
+| **ollama** | 11434 | Local LLM (Phi-4) + safety (LlamaGuard) |
+| **kokoro-tts** | 8880 | Local text-to-speech |
+
+## Features
+
+- **Voice-First**: Tap-to-talk interface optimized for kids 6-12
+- **Local LLM**: Phi-4 via Ollama for fast, private inference
+- **RAG Pipeline**: LanceDB vector search over curated zoo content
+- **Safety Guardrails**: LlamaGuard + prompt injection detection
+- **Local TTS**: Kokoro for low-latency speech synthesis
+- **OpenAI Fallback**: Automatic failover when local services unavailable
+
+## Services
+
+### Core (Always Running)
+```bash
+docker compose up -d
 ```
-Trusted URLs → Docling Extraction → HybridChunker → OpenAI Embeddings → LanceDB Storage
+
+### Admin Portal (Optional)
+```bash
+docker compose --profile admin up -d
+# Access: http://localhost:3001
+# Default: admin / zoocari-admin
 ```
 
-### STT Fallback Chain
-1. **Faster-Whisper** (local, ~300ms) - Primary, free, offline capable
-2. **OpenAI Whisper API** (cloud, ~800ms) - Fallback
+### HTTPS Tunnel (For Mobile Voice)
+```bash
+docker compose --profile tunnel up -d
+# Requires: CLOUDFLARE_TUNNEL_TOKEN in .env
+```
 
-### TTS Fallback Chain
-1. **Kokoro** (local, 50-200ms) - Primary, requires espeak-ng
-2. **ElevenLabs** (cloud, 500-2000ms) - First fallback
-3. **OpenAI TTS** (cloud, 300-800ms) - Final fallback
+## Configuration
 
-### Key Environment Variables
-- `OPENAI_API_KEY` - Required for chat, embeddings, and STT fallback
-- `ELEVENLABS_API_KEY` - Optional, for cloud TTS fallback
-- `TTS_PROVIDER` - kokoro, elevenlabs, or openai
-- `TTS_VOICE` - Voice ID (default: af_heart for Kokoro)
+Key environment variables in `.env`:
 
-## Common Tasks
+```bash
+# Required
+OPENAI_API_KEY=sk-...
 
-- **Add new animal sources:** Edit `zoo_sources.py`, then run `python zoo_build_knowledge.py`
-- **Modify Zoocari persona:** Edit `ZUCARI_SYSTEM_PROMPT` in `zoo_chat.py`
-- **Change UI styling:** Edit `static/zoocari.css`
-- **Switch TTS provider:** Set `TTS_PROVIDER` in `.env`
+# LLM (default: local Ollama)
+LLM_PROVIDER=ollama              # ollama | openai
+OLLAMA_MODEL=phi4
+
+# TTS (default: local Kokoro)
+TTS_PROVIDER=kokoro              # kokoro | elevenlabs | openai
+
+# STT (default: local Faster-Whisper)
+STT_PROVIDER=faster-whisper      # faster-whisper | openai
+```
+
+## Data Storage
+
+```
+./data/
+├── zoo_lancedb/          # Vector database (RAG)
+├── sessions.db           # Chat session history
+└── admin_config.json     # Runtime configuration
+
+Docker volumes:
+├── zoocari-ollama-models # ~7GB (Phi-4, LlamaGuard)
+├── zoocari-kokoro-models # ~500MB (TTS models)
+└── zoocari-hf-cache      # HuggingFace cache
+```
+
+## Development
+
+```bash
+# Backend (FastAPI)
+cd apps/api
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+
+# Frontend (React)
+cd apps/web
+npm install
+npm run dev
+
+# Run tests
+cd apps/api && pytest tests/ -v
+```
+
+## Documentation
+
+| Doc | Description |
+|-----|-------------|
+| [Quick Start](docs/QUICK_START.md) | One-command setup guide |
+| [Deployment](docs/DEPLOYMENT.md) | Full deployment guide |
+| [Cloudflare Tunnel](docs/CLOUDFLARE_TUNNEL_SETUP.md) | HTTPS setup for mobile |
+| [Admin Portal](docs/design/admin-portal-architecture.md) | Admin portal design |
+| [Ollama Integration](docs/integration/OLLAMA_INTEGRATION_PLAN.md) | Local LLM setup |
+
+## Requirements
+
+- Docker + Docker Compose
+- 12GB+ RAM (8GB for Ollama)
+- 10GB+ disk space
+- OpenAI API key (for fallback)
+
+## License
+
+MIT

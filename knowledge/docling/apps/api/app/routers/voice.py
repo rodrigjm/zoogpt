@@ -3,13 +3,15 @@ Voice (STT/TTS) router.
 Per CONTRACT.md Part 4: Voice.
 """
 
+import asyncio
 import base64
 import json
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Annotated
 
-from fastapi import APIRouter, File, Form, UploadFile, status
+from fastapi import APIRouter, File, Form, UploadFile, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import JSONResponse, Response
 from sse_starlette.sse import EventSourceResponse
 
@@ -36,6 +38,9 @@ _rag_service = RAGService()
 _analytics_service = get_analytics_service()
 
 router = APIRouter(prefix="/voice", tags=["voice"])
+
+# Thread pool executor for parallel TTS processing
+_tts_executor = ThreadPoolExecutor(max_workers=settings.tts_max_workers)
 
 
 # Sentence boundary detection for streaming TTS
@@ -435,3 +440,141 @@ async def tts_stream(body: TTSStreamRequest):
             }
 
     return EventSourceResponse(generate_audio_stream())
+
+
+@router.websocket("/tts/ws")
+async def tts_websocket(websocket: WebSocket):
+    """
+    WebSocket endpoint for streaming TTS audio.
+
+    This endpoint receives text messages via WebSocket and streams back
+    audio chunks in real-time using the Kokoro-FastAPI sidecar or
+    local Kokoro-ONNX synthesis with parallel processing.
+
+    Protocol (matches frontend contract):
+    1. Client connects to websocket
+    2. Client sends JSON: {"session_id": "...", "text": "...", "voice": "..."}
+    3. Server sends JSON: {"type": "audio", "data": "<base64 PCM>", "index": n}
+    4. Server sends JSON when complete: {"type": "done"}
+    5. On error: {"type": "error", "data": "<error message>"}
+    6. Connection remains open for next request
+
+    Audio format: PCM 24kHz float32, base64 encoded
+    """
+    import base64
+
+    await websocket.accept()
+    logger.info(f"[WS_TTS] WebSocket connection accepted")
+
+    try:
+        while True:
+            # Receive text message from client
+            try:
+                data = await websocket.receive_json()
+            except WebSocketDisconnect:
+                logger.info("[WS_TTS] Client disconnected")
+                break
+
+            # Parse request (frontend sends session_id, text, voice)
+            text = data.get("text", "")
+            voice = data.get("voice", settings.tts_voice)
+            speed = data.get("speed", 1.0)
+            use_streaming = data.get("use_streaming", settings.tts_streaming_enabled)
+            # session_id is passed by frontend but not used by TTS
+
+            if not text:
+                await websocket.send_json({
+                    "type": "error",
+                    "data": "Text field is required"
+                })
+                continue
+
+            logger.info(f"[WS_TTS] Processing TTS request: {len(text)} chars, voice={voice}")
+
+            try:
+                chunk_count = 0
+
+                if use_streaming and settings.tts_streaming_enabled:
+                    # Use Kokoro-FastAPI sidecar for streaming
+                    logger.info("[WS_TTS] Using streaming TTS service")
+                    from ..services.tts_streaming import stream_tts_with_fallback
+
+                    async for audio_chunk in stream_tts_with_fallback(
+                        text=text,
+                        voice=voice,
+                        speed=speed,
+                        fallback_to_local=True
+                    ):
+                        # Encode as base64 and send as JSON (frontend contract)
+                        audio_base64 = base64.b64encode(audio_chunk).decode('utf-8')
+                        await websocket.send_json({
+                            "type": "audio",
+                            "data": audio_base64,
+                            "index": chunk_count
+                        })
+                        chunk_count += 1
+                        logger.debug(f"[WS_TTS] Sent chunk {chunk_count} ({len(audio_chunk)} bytes)")
+
+                else:
+                    # Use local Kokoro-ONNX with parallel processing
+                    logger.info("[WS_TTS] Using local TTS with parallel processing")
+
+                    # Split text into sentences for parallel processing
+                    sentences, _ = extract_sentences(text + ".")  # Add period to ensure extraction
+                    if not sentences:
+                        sentences = [text]
+
+                    # Process sentences in parallel batches
+                    loop = asyncio.get_event_loop()
+                    batch_size = settings.tts_max_workers
+
+                    for i in range(0, len(sentences), batch_size):
+                        batch = sentences[i:i + batch_size]
+
+                        # Synthesize batch in parallel
+                        tasks = [
+                            loop.run_in_executor(
+                                _tts_executor,
+                                _tts_service.synthesize_kokoro,
+                                sentence,
+                                voice,
+                                speed,
+                                False  # chunk_long_text=False (already chunked)
+                            )
+                            for sentence in batch
+                        ]
+
+                        # Wait for all tasks in batch to complete
+                        audio_chunks = await asyncio.gather(*tasks)
+
+                        # Send audio chunks in order (as base64 JSON)
+                        for audio_bytes in audio_chunks:
+                            audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+                            await websocket.send_json({
+                                "type": "audio",
+                                "data": audio_base64,
+                                "index": chunk_count
+                            })
+                            chunk_count += 1
+                            logger.debug(f"[WS_TTS] Sent chunk {chunk_count} ({len(audio_bytes)} bytes)")
+
+                # Send completion message (frontend expects {type: 'done'})
+                await websocket.send_json({
+                    "type": "done",
+                    "chunks": chunk_count
+                })
+                logger.info(f"[WS_TTS] TTS complete: {chunk_count} chunks sent")
+
+            except Exception as e:
+                logger.error(f"[WS_TTS] TTS processing failed: {e}")
+                await websocket.send_json({
+                    "type": "error",
+                    "data": str(e)
+                })
+
+    except WebSocketDisconnect:
+        logger.info("[WS_TTS] WebSocket disconnected")
+    except Exception as e:
+        logger.error(f"[WS_TTS] WebSocket error: {e}")
+    finally:
+        logger.info("[WS_TTS] WebSocket connection closed")

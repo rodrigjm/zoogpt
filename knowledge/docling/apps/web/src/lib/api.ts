@@ -24,6 +24,24 @@ import type {
 const API_BASE = '/api';
 
 /**
+ * Get WebSocket URL for a given path
+ * Converts http:// to ws:// and https:// to wss://
+ */
+export function getWebSocketUrl(path: string): string {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  if (apiUrl) {
+    // Remove http/https and use ws/wss
+    const host = apiUrl.replace(/^https?:\/\//, '');
+    return `${protocol}//${host}${path}`;
+  }
+
+  // Default to same host
+  return `${protocol}//${window.location.host}${path}`;
+}
+
+/**
  * Generic fetch wrapper with error handling
  */
 async function apiFetch<T>(

@@ -19,6 +19,7 @@ interface VoiceState {
   audioUrl: string | null;
   error: string | null;
   selectedVoice: string;
+  useWebSocket: boolean;
 
   // Recording internals (not persisted)
   mediaRecorder: MediaRecorder | null;
@@ -37,6 +38,7 @@ interface VoiceState {
   stopPlayback: () => void;
   setVoice: (voice: string) => void;
   setError: (error: string | null) => void;
+  toggleWebSocket: () => void;
   reset: () => void;
 }
 
@@ -50,6 +52,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   audioUrl: null,
   error: null,
   selectedVoice: 'bella',
+  useWebSocket: true,
   mediaRecorder: null,
   audioChunks: [],
   streamingSentences: [],
@@ -331,6 +334,11 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   // Set error
   setError: (error) => {
     set({ error });
+  },
+
+  // Toggle WebSocket usage
+  toggleWebSocket: () => {
+    set((state) => ({ useWebSocket: !state.useWebSocket }));
   },
 
   // Reset store to initial state

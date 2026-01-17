@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .routers import session_router, chat_router, voice_router
-from .services.tts import preload_kokoro_pipeline
+from .services.tts import preload_kokoro_instance
 from .services.analytics import get_analytics_service
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     """
     # Startup
     logger.info("Starting up Zoocari API...")
-    preload_kokoro_pipeline()
+    preload_kokoro_instance()
     # Initialize analytics service (creates tables if needed)
     get_analytics_service()
     logger.info("Analytics service initialized")

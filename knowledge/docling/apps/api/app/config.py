@@ -5,7 +5,7 @@ Loads environment variables from .env file.
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator
-from typing import Optional, Union
+from typing import Any, Optional, Union
 from pathlib import Path
 import json
 import threading
@@ -38,10 +38,20 @@ class Settings(BaseSettings):
     # OpenAI
     openai_api_key: str
 
+    # LLM Settings
+    llm_provider: str = "ollama"
+    ollama_url: str = "http://ollama:11434"
+    ollama_model: str = "phi4"
+    ollama_guard_model: str = "llama-guard3:1b"
+
     # TTS Settings
     tts_provider: str = "kokoro"
     tts_voice: str = "af_heart"
     elevenlabs_api_key: Optional[str] = None
+    kokoro_tts_url: str = "http://kokoro-tts:8880"
+    tts_streaming_enabled: bool = True
+    tts_chunk_size: int = 300
+    tts_max_workers: int = 3
 
     # STT Settings
     stt_provider: str = "faster-whisper"
@@ -187,7 +197,7 @@ class DynamicConfig:
             # If config is invalid, keep using previous config
             print(f"[DynamicConfig] Error loading config: {e}. Using previous config.")
 
-    def _get_nested(self, *keys, default=None):
+    def _get_nested(self, *keys: str, default: Any = None) -> Any:
         """Safely get nested config value with reload check."""
         self._reload_if_changed()
 
@@ -206,42 +216,42 @@ class DynamicConfig:
     @property
     def system_prompt(self) -> str:
         """Get current system prompt."""
-        return self._get_nested("prompts", "system_prompt", default="You are Zoocari the Elephant.")
+        return str(self._get_nested("prompts", "system_prompt", default="You are Zoocari the Elephant."))
 
     @property
     def fallback_response(self) -> str:
         """Get current fallback response."""
-        return self._get_nested("prompts", "fallback_response", default="I don't know about that!")
+        return str(self._get_nested("prompts", "fallback_response", default="I don't know about that!"))
 
     @property
     def model_name(self) -> str:
         """Get current model name."""
-        return self._get_nested("model", "name", default="gpt-4o-mini")
+        return str(self._get_nested("model", "name", default="gpt-4o-mini"))
 
     @property
     def model_temperature(self) -> float:
         """Get current model temperature."""
-        return self._get_nested("model", "temperature", default=0.7)
+        return float(self._get_nested("model", "temperature", default=0.7))
 
     @property
     def model_max_tokens(self) -> int:
         """Get current model max_tokens."""
-        return self._get_nested("model", "max_tokens", default=500)
+        return int(self._get_nested("model", "max_tokens", default=500))
 
     @property
     def tts_provider(self) -> str:
         """Get current TTS provider."""
-        return self._get_nested("tts", "provider", default="kokoro")
+        return str(self._get_nested("tts", "provider", default="kokoro"))
 
     @property
     def tts_default_voice(self) -> str:
         """Get current TTS default voice."""
-        return self._get_nested("tts", "default_voice", default="af_heart")
+        return str(self._get_nested("tts", "default_voice", default="af_heart"))
 
     @property
     def tts_speed(self) -> float:
         """Get current TTS speed."""
-        return self._get_nested("tts", "speed", default=1.0)
+        return float(self._get_nested("tts", "speed", default=1.0))
 
 
 # Global dynamic config instance

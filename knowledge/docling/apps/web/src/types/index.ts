@@ -120,6 +120,20 @@ export interface TtsStreamDoneData {
   sources?: Source[];
 }
 
+// WebSocket TTS Types
+export interface TTSWebSocketMessage {
+  type: 'text' | 'audio' | 'done' | 'error';
+  data?: string; // base64 audio or error message
+  sentence?: string; // for type='text'
+  index?: number; // sentence index
+}
+
+export interface TTSWebSocketRequest {
+  session_id: string;
+  text: string;
+  voice?: string;
+}
+
 // ===== Health Types =====
 
 export interface HealthResponse {

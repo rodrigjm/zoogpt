@@ -1,4 +1,24 @@
 services:
+  kokoro-tts:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: zoocari-kokoro-tts-dev
+    ports:
+      - "8880:8880"
+    environment:
+      - TARGET_MIN_TOKENS=100
+      - TARGET_MAX_TOKENS=200
+      - DEFAULT_VOICE=af_heart
+    volumes:
+      - zoocari-kokoro-models:/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8880/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - zoocari
+    restart: unless-stopped
+
   api:
     build:
       context: ..
@@ -26,6 +46,7 @@ services:
       # TTS settings
       - TTS_PROVIDER=${TTS_PROVIDER:-kokoro}
       - TTS_VOICE=${TTS_VOICE:-af_heart}
+      - KOKORO_TTS_URL=http://kokoro-tts:8880
       - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
       # STT settings
       - STT_PROVIDER=${STT_PROVIDER:-faster-whisper}
@@ -33,6 +54,8 @@ services:
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
     networks:
       - zoocari
+    depends_on:
+      - kokoro-tts
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -67,3 +90,7 @@ services:
 networks:
   zoocari:
     driver: bridge
+
+volumes:
+  zoocari-kokoro-models:
+    name: zoocari-kokoro-models

@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libsndfile1 \
     ffmpeg \
+    libgomp1 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -20,6 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY app/ ./app/
+
+# Copy tests for validation (optional - can be removed in production)
+COPY tests/ ./tests/
 
 # Create data directory
 RUN mkdir -p /app/data

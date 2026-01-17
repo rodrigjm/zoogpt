@@ -16,6 +16,62 @@
 
 services:
   # ============================================================
+  # Ollama - Local LLM Inference
+  # ============================================================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: zoocari-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - zoocari-ollama-models:/root/.ollama
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================
+  # Kokoro TTS - FastAPI Sidecar Service
+  # ============================================================
+  kokoro-tts:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: zoocari-kokoro-tts
+    ports:
+      - "8880:8880"
+    environment:
+      - TARGET_MIN_TOKENS=100
+      - TARGET_MAX_TOKENS=200
+      - DEFAULT_VOICE=af_heart
+    volumes:
+      - zoocari-kokoro-models:/app/models
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8880/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================
   # Main API - FastAPI Backend
   # ============================================================
   api:
@@ -37,6 +93,11 @@ services:
       - TTS_PROVIDER=${TTS_PROVIDER:-kokoro}
       - TTS_VOICE=${TTS_VOICE:-af_heart}
       - STT_PROVIDER=${STT_PROVIDER:-faster-whisper}
+      - KOKORO_TTS_URL=http://kokoro-tts:8880
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=phi4
+      - OLLAMA_GUARD_MODEL=llama-guard3:1b
+      - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - LANCEDB_PATH=/app/data/zoo_lancedb
       - SESSION_DB_PATH=/app/data/sessions.db
       - PYTHONUNBUFFERED=1
@@ -45,6 +106,9 @@ services:
     env_file:
       - path: .env
         required: false
+    depends_on:
+      - ollama
+      - kokoro-tts
     restart: unless-stopped
     deploy:
       resources:
@@ -156,3 +220,7 @@ volumes:
     name: zoocari-hf-cache
   zoocari-torch-cache:
     name: zoocari-torch-cache
+  zoocari-kokoro-models:
+    name: zoocari-kokoro-models
+  zoocari-ollama-models:
+    name: zoocari-ollama-models
