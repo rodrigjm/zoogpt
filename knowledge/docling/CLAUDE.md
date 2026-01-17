@@ -9,7 +9,45 @@ IMPORTANT:
 - Agents and subagents must be used to control scope, cost, and complexity.
 
 ### Workflow
-- create a detailed project plan with phases and clearly defined tasks -- design the plan to run 3 of the appropriate subagents in parallel. Once the respective agent has completed it's task - i want to implement logic that will run thru QA subagent, and Troubleshooting subagent (from results of QA) in an iterative fashion until tests are passed. When all tasks are complete, pass to devops agent to buildout and deploy
+- create a detailed project plan with phases and clearly defined tasks -- design the plan to run 3 of the appropriate subagents in parallel. Once the respective agent has completed it's task - i want to implement logic that will run thru QA subagent, and Troubleshooting subagent (from results of QA) in an iterative fashion until tests are passed. When all tasks are complete, pass to devops agent to buildout and deploy. Program Management subagent - must keep update documentation to summarize and track tasks completed in the workflow.
+
+### DOCUMENT MANAGEMENT
+
+#### Directory Structure
+```
+docs/
+├── ProjectPlan.md          # Master tracker (ALWAYS update this)
+├── README.md               # Structure guide
+├── active/                 # 🔄 ONGOING feature work
+│   └── <feature-name>/     # One directory per active feature
+└── archive/                # ✅ COMPLETED features
+```
+
+#### ProjectPlan.md (Source of Truth)
+- **Current Deployment**: What's running in production
+- **Active Features**: Links to `docs/active/<feature>/` directories
+- **Bugs & Issues**: Open bugs with severity and status
+- **Completed (Recent)**: Recently finished work with archive links
+- **Roadmap**: Q1/Q2 goals and backlog items
+
+#### Workflow: Starting a Feature
+1. Copy `docs/active/_TEMPLATE/` → `docs/active/<feature-name>/`
+2. Update `docs/ProjectPlan.md` → add to "Active Features" section
+3. Create subdocs: `design.md`, `implementation.md`, `qa-report.md`
+4. Update feature README.md with progress as work continues
+
+#### Workflow: Completing a Feature
+1. Move `docs/active/<feature-name>/` → `docs/archive/<feature-name>/`
+2. Update `docs/ProjectPlan.md`:
+   - Remove from "Active Features"
+   - Add to "Completed (Recent)" with archive link
+   - Mark roadmap items as complete if applicable
+3. Subagent must notify main agent of completion
+
+#### Inter-Agent Communication
+- Long-running tasks: Write progress to `docs/active/<feature>/status.md`
+- Main agent checks `status.md` instead of reading full execution logs
+- QA/Troubleshooting results go to `docs/active/<feature>/qa-report.md`
 
 ### When to Use Subagents
 - Use subagents for their intended purposes as in the subagent mission
@@ -17,14 +55,6 @@ IMPORTANT:
 - Do NOT use subagents for final decisions, projectplan tracking, or project-wide planning.
 - If the subagent task is long-running, maintain updates and inter-agent communciations as part of status.md file with the current progress and next steps. Main agent (you) should not rely on reading the full execution log for state.
 
-
-### Collaboration Model
-- Subagents collaborate ONLY through shared artifacts:
-  - docs/integration/CONTRACT.md
-  - docs/integration/STATUS.md
-  - shared types and integration tests
-- Subagents must NOT negotiate behavior in chat.
-- If behavior is unclear, write a question to STATUS.md.
 
 ### Output Discipline
 - Subagents must return:
@@ -100,7 +130,7 @@ Tokens are a shared, finite resource. Claude must actively manage context size.
 - Never paste large logs or files into the main thread if a subagent can analyze them.
 - Do not restate previously agreed plans or contracts unless they change.
 - Avoid reloading files that have already been summarized.
-- If writting markdown file/memory/overview - write into /docs folder with hierchichal naming convention
+- If writing markdown file/memory/overview - write to `docs/active/<feature>/` for ongoing work
 
 ### Subagent Token Discipline
 - Use subagents for any task that:
@@ -122,7 +152,7 @@ Tokens are a shared, finite resource. Claude must actively manage context size.
 - If context becomes cluttered or unfocused:
   - Prefer `/compact` to retain a summary.
   - Use `/clear` when switching to an unrelated task.
-- Final decisions and outcomes should be recorded in docs, not relied on from chat history.
+- Final decisions and outcomes should be recorded in `docs/ProjectPlan.md` or feature docs, not relied on from chat history.
 
 ### Anti-Patterns to Avoid
 - Re-planning during execution
