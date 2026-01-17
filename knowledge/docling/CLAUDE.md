@@ -8,6 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 IMPORTANT:
 - Agents and subagents must be used to control scope, cost, and complexity.
 
+### Workflow
+- create a detailed project plan with phases and clearly defined tasks -- design the plan to run 3 of the appropriate subagents in parallel. Once the respective agent has completed it's task - i want to implement logic that will run thru QA subagent, and Troubleshooting subagent (from results of QA) in an iterative fashion until tests are passed. When all tasks are complete, pass to devops agent to buildout and deploy
+
 ### When to Use Subagents
 - Use subagents for their intended purposes as in the subagent mission
 - use MCP as needed - if missing useful MCP recommend one
