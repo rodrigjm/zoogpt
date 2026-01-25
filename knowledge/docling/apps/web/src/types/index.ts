@@ -62,6 +62,9 @@ export interface Source {
   animal: string;
   title: string;
   url?: string;
+  thumbnail?: string;
+  image_urls?: string[];
+  alt?: string;
 }
 
 export interface ChatResponse {

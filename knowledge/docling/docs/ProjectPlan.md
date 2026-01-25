@@ -1,6 +1,6 @@
 # Zoocari Project Plan
 
-> **Last Updated:** 2026-01-17
+> **Last Updated:** 2026-01-24
 > **Status:** Active Development
 > **Branch:** feature/node-fastapi-migration
 
@@ -26,18 +26,34 @@
 
 ## Active Features (In Progress)
 
-### 🔄 [Feature Name]
-- **Directory:** `docs/active/<feature-name>/`
-- **Status:** Phase X of Y
-- **Owner:** [Agent/Team]
-- **Started:** YYYY-MM-DD
+### 🔄 Multi-Lingual Support (English/Spanish)
+- **Directory:** `docs/active/multilingual-support/`
+- **Status:** Phase 0 of 6 (Planning Complete)
+- **Owner:** TBD
+- **Started:** 2026-01-20
 
 | Task | Status | Notes |
 |------|--------|-------|
-| Research/Design | ⬜ | |
-| Implementation | ⬜ | |
+| Design & Planning | ✅ | [design.md](./active/multilingual-support/design.md) |
+| Phase 1: API Contracts | ⬜ | Foundation for all phases |
+| Phase 2-4: Voice/RAG/Frontend | ⬜ | Parallel execution |
+| Phase 5-6: KB/Safety | ⬜ | Sequential |
 | QA Validation | ⬜ | |
 | Deployment | ⬜ | |
+
+### ✅ Animal Pictures in Chat
+- **Directory:** `docs/active/animal-pictures/`
+- **Status:** Implementation Complete - Ready for Testing
+- **Owner:** Frontend Agent
+- **Started:** 2026-01-20
+- **Completed:** 2026-01-24
+
+| Task | Status | Notes |
+|------|--------|-------|
+| UX Decision | ✅ Done | Collapsible Gallery (Option C) |
+| Image Source Decision | ✅ Done | JSON config file |
+| Implementation | ✅ Done | 4 components, 8 animals configured |
+| QA & Polish | ⬜ Pending | Manual testing needed |
 
 ---
 
@@ -64,9 +80,13 @@
 ## Roadmap
 
 ### Q1 2026
-- [ ] add picture slideshow of animals in question - maybe of park animals
-- [ ] Multi-language support
-- [ ] Analytics dashboard
+- [x] add picture slideshow of animals in question → **Active:** `docs/active/animal-pictures/`
+- [ ] add personalized information for each animal - same vector or seperate pass?
+- [ ] Thumbs up/down on answers provided
+- [x] Multi-language support → **Active:** `docs/active/multilingual-support/`
+- [ ] admin app - Analytics dashboard - ability to review per model performance & ability to change ollama models (with ollama endpoint instantiaion and retireing old model)
+- [ ] feedback text/record button for additional feedback on experience
+- [ ] local ollama hosted embedding model
 
 ### Q2 2026
 - [ ] Mobile app companion

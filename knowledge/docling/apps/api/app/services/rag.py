@@ -4,8 +4,10 @@ Implements LanceDB retrieval and LLM response generation (Ollama-first, OpenAI f
 """
 
 import re
+import json
 import httpx
 import lancedb
+from pathlib import Path
 from openai import OpenAI
 
 from ..config import settings, dynamic_config
@@ -91,6 +93,7 @@ class RAGService:
         self._table = None
         self._openai_client = None
         self._llm_service = None
+        self._animal_images = None
 
     @property
     def db(self):
@@ -119,6 +122,23 @@ class RAGService:
         if self._llm_service is None:
             self._llm_service = LLMService(openai_api_key=settings.openai_api_key)
         return self._llm_service
+
+    @property
+    def animal_images(self) -> dict:
+        """Lazy-load animal images config."""
+        if self._animal_images is None:
+            config_path = Path(settings.lancedb_path).parent / "animal_images.json"
+            try:
+                with open(config_path, "r") as f:
+                    self._animal_images = json.load(f)
+                timed_print(f"  [RAG] Loaded animal images config: {len(self._animal_images)} animals")
+            except FileNotFoundError:
+                timed_print(f"  [RAG] Warning: animal_images.json not found at {config_path}")
+                self._animal_images = {}
+            except json.JSONDecodeError as e:
+                timed_print(f"  [RAG] Warning: Failed to parse animal_images.json: {e}")
+                self._animal_images = {}
+        return self._animal_images
 
     def search_context(
         self, query: str, num_results: int = 5
@@ -152,8 +172,17 @@ class RAGService:
             title = metadata.get("title", "")
             url = metadata.get("url", "")
 
-            # Build source object
-            sources.append({"animal": animal_name, "title": title, "url": url})
+            # Build source object with image URLs if available
+            source = {"animal": animal_name, "title": title, "url": url}
+
+            # Add image data if this animal has configured images
+            if animal_name in self.animal_images:
+                image_data = self.animal_images[animal_name]
+                source["thumbnail"] = image_data.get("thumbnail")
+                source["image_urls"] = image_data.get("images", [])
+                source["alt"] = image_data.get("alt")
+
+            sources.append(source)
 
             # Track distance for confidence calculation
             if "_distance" in row:

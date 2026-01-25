@@ -1,5 +1,6 @@
 import React, { memo } from 'react';
 import type { ChatMessage, Source } from '../types';
+import { AnimalImageGallery } from './index';
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -17,6 +18,23 @@ const StreamingIndicator: React.FC = () => (
 
 const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isStreaming = false, sources }) => {
   const isUser = message.role === 'user';
+
+  // Extract unique animals that have images
+  const animalsWithImages = React.useMemo(() => {
+    if (!sources || isStreaming) return [];
+
+    const animalMap = new Map<string, Source>();
+    sources.forEach(source => {
+      if (source.image_urls && source.image_urls.length > 0) {
+        // Only add if not already present (deduplication by animal name)
+        if (!animalMap.has(source.animal)) {
+          animalMap.set(source.animal, source);
+        }
+      }
+    });
+
+    return Array.from(animalMap.values());
+  }, [sources, isStreaming]);
 
   return (
     <div className={`flex w-full mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -36,6 +54,19 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isStreaming
         </p>
         {isStreaming && !isUser && (
           <StreamingIndicator />
+        )}
+        {!isStreaming && !isUser && animalsWithImages.length > 0 && (
+          <div className="mt-4">
+            {animalsWithImages.map((source) => (
+              <AnimalImageGallery
+                key={source.animal}
+                animal={source.animal}
+                images={source.image_urls!}
+                thumbnail={source.thumbnail}
+                alt={source.alt}
+              />
+            ))}
+          </div>
         )}
         {sources && sources.length > 0 && !isUser && (
           <div className="mt-3 pt-3 border-t border-leesburg-brown/20">
