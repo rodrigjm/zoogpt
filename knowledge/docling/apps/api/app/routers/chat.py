@@ -72,6 +72,10 @@ async def chat(body: ChatRequest):
     input_check = validate_input(body.message)
     if not input_check.is_safe:
         timer.end(f"INPUT_BLOCKED: {input_check.reason}")
+        # Log blocked message for abuse monitoring
+        _session_service.log_blocked_message(
+            body.session_id, body.message, input_check.reason or "safety_filter"
+        )
         message_id = str(uuid.uuid4())
         now = datetime.now(UTC)
         return {
@@ -133,6 +137,15 @@ async def chat(body: ChatRequest):
         llm_latency_ms=timings.llm_ms,
     )
 
+    # Save chat history for feedback tracking
+    _session_service.save_message(body.session_id, "user", body.message)
+    _session_service.save_message(
+        body.session_id,
+        "assistant",
+        reply,
+        metadata={"sources": sources, "confidence": confidence}
+    )
+
     # Return response per CONTRACT.md
     return {
         "session_id": body.session_id,
@@ -186,6 +199,10 @@ async def chat_stream(body: ChatRequest):
     input_check = validate_input(body.message)
     if not input_check.is_safe:
         timer.end(f"INPUT_BLOCKED: {input_check.reason}")
+        # Log blocked message for abuse monitoring
+        _session_service.log_blocked_message(
+            body.session_id, body.message, input_check.reason or "safety_filter"
+        )
 
         async def blocked_generator():
             # Send blocked response as a single text chunk + done
@@ -257,6 +274,15 @@ async def chat_stream(body: ChatRequest):
                 latency_ms=total_ms,
                 rag_latency_ms=timings.rag_ms,
                 llm_latency_ms=timings.llm_ms,
+            )
+
+            # Save chat history for feedback tracking
+            _session_service.save_message(body.session_id, "user", body.message)
+            _session_service.save_message(
+                body.session_id,
+                "assistant",
+                full_response,
+                metadata={"sources": sources, "confidence": confidence}
             )
 
         except Exception as e:

@@ -52,12 +52,33 @@ INJECTION_PATTERNS = [
 ]
 
 # Zoo topic keywords for on-topic check
+# Includes general terms + all park animals
 ZOO_KEYWORDS = [
+    # General terms
     "animal", "zoo", "park", "leesburg", "feed", "pet", "visit",
-    "lion", "tiger", "elephant", "giraffe", "monkey", "bear",
-    "bird", "snake", "reptile", "mammal", "habitat", "wild",
-    "eat", "sleep", "play", "baby", "cute", "big", "small",
-    "hello", "hi", "hey", "thanks", "help", "what", "how", "why",
+    "habitat", "wild", "eat", "sleep", "play", "baby", "cute", "big", "small",
+    "hello", "hi", "hey", "thanks", "help", "what", "how", "why", "tell", "about",
+    # Categories
+    "mammal", "bird", "reptile", "amphibian", "insect", "arachnid", "primate",
+    # Park animals - mammals
+    "goat", "sheep", "pig", "donkey", "horse", "pony", "llama", "alpaca",
+    "camel", "zebra", "deer", "nilgai", "zebu", "cow", "cattle",
+    "rabbit", "bunny", "chinchilla", "hedgehog", "porcupine",
+    "lemur", "monkey", "tamarin", "marmoset", "gibbon", "sloth",
+    "wallaby", "kangaroo", "serval", "cat", "dog", "coati", "meerkat",
+    "bear", "lion", "tiger", "elephant", "giraffe", "gorilla", "orangutan",
+    # Park animals - birds
+    "peacock", "peafowl", "turkey", "chicken", "duck", "goose",
+    "emu", "ostrich", "crane", "parrot", "macaw", "cockatoo",
+    "kookaburra", "raven", "crow", "hawk", "eagle", "owl",
+    # Park animals - reptiles/amphibians
+    "snake", "python", "boa", "tortoise", "turtle", "lizard",
+    "gecko", "skink", "tegu", "iguana", "chameleon",
+    "frog", "toad", "salamander", "newt",
+    # Park animals - invertebrates
+    "scorpion", "spider", "tarantula", "beetle", "cockroach", "millipede",
+    # Other common zoo animals in KB
+    "panda", "koala", "penguin", "dolphin", "shark", "octopus", "jellyfish",
 ]
 
 # Maximum input length for kid Q&A

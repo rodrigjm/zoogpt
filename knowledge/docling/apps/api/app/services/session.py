@@ -95,6 +95,25 @@ class SessionService:
                 ON chat_history(session_id, timestamp DESC)
             """)
 
+            # Blocked messages table - tracks safety filter blocks for abuse monitoring
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS blocked_messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    block_reason TEXT NOT NULL,
+                    block_source TEXT DEFAULT 'llamaguard',
+                    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    reviewed_at TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+                )
+            """)
+
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_blocked_messages_session
+                ON blocked_messages(session_id)
+            """)
+
             conn.commit()
 
     def get_or_create_session(
@@ -201,6 +220,37 @@ class SessionService:
 
             conn.commit()
             return message_id
+
+    def log_blocked_message(
+        self,
+        session_id: str,
+        message: str,
+        block_reason: str,
+        block_source: str = "llamaguard"
+    ) -> Optional[int]:
+        """
+        Log a message that was blocked by safety filters.
+
+        Args:
+            session_id: Session identifier
+            message: The blocked message content
+            block_reason: Reason for blocking
+            block_source: Source of the block (llamaguard, openai_moderation, etc.)
+
+        Returns:
+            Record ID
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+
+            cursor.execute(
+                """INSERT INTO blocked_messages (session_id, message, block_reason, block_source)
+                   VALUES (?, ?, ?, ?)""",
+                (session_id, message, block_reason, block_source)
+            )
+            record_id = cursor.lastrowid
+            conn.commit()
+            return record_id
 
     def get_chat_history(
         self,

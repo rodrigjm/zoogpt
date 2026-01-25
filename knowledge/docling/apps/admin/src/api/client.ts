@@ -190,3 +190,18 @@ export const imagesApi = {
   syncImages: () =>
     api<{ ok: boolean; added: string[]; removed: string[]; total_files: number }>('/images/sync', { method: 'POST' }),
 }
+
+// Feedback API
+export const feedbackApi = {
+  getStats: (days = 7) =>
+    api<import('../types').FeedbackStats>('/feedback/stats', { params: { days } }),
+
+  getList: (params?: { type?: string; flagged?: boolean; limit?: number; offset?: number }) =>
+    api<{ total: number; items: import('../types').FeedbackItem[] }>('/feedback/list', { params }),
+
+  toggleFlag: (id: number) =>
+    api<import('../types').FeedbackItem>(`/feedback/${id}/flag`, { method: 'PATCH' }),
+
+  markReviewed: (id: number) =>
+    api<import('../types').FeedbackItem>(`/feedback/${id}/reviewed`, { method: 'PATCH' }),
+}

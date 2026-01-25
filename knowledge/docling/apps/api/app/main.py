@@ -10,7 +10,7 @@ from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .config import settings
-from .routers import session_router, chat_router, voice_router
+from .routers import session_router, chat_router, voice_router, feedback_router
 from .services.tts import preload_kokoro_instance
 from .services.analytics import get_analytics_service
 
@@ -64,12 +64,14 @@ api_router = APIRouter(prefix="/api")
 api_router.include_router(session_router)
 api_router.include_router(chat_router)
 api_router.include_router(voice_router)
+api_router.include_router(feedback_router)
 app.include_router(api_router)
 
 # Also register routers without prefix for dev compatibility (Vite strips /api)
 app.include_router(session_router)
 app.include_router(chat_router)
 app.include_router(voice_router)
+app.include_router(feedback_router)
 
 # Mount static files (production frontend)
 # Only mount if static directory exists (production mode)

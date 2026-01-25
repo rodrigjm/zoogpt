@@ -1,11 +1,14 @@
-import React, { memo } from 'react';
+import React, { memo, useState, useCallback } from 'react';
 import type { ChatMessage, Source } from '../types';
 import { AnimalImageGallery } from './index';
+import { submitRating } from '../lib/api';
+import { useSessionStore } from '../stores';
 
 interface MessageBubbleProps {
   message: ChatMessage;
   isStreaming?: boolean;
   sources?: Source[];
+  onRatingChange?: (messageId: string, rating: 'up' | 'down') => void;
 }
 
 const StreamingIndicator: React.FC = () => (
@@ -16,8 +19,11 @@ const StreamingIndicator: React.FC = () => (
   </div>
 );
 
-const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isStreaming = false, sources }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isStreaming = false, sources, onRatingChange }) => {
   const isUser = message.role === 'user';
+  const { sessionId } = useSessionStore();
+  const [rating, setRating] = useState<'up' | 'down' | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Extract unique animals that have images
   const animalsWithImages = React.useMemo(() => {
@@ -35,6 +41,22 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isStreaming
 
     return Array.from(animalMap.values());
   }, [sources, isStreaming]);
+
+  // Handle rating click
+  const handleRating = useCallback(async (newRating: 'up' | 'down') => {
+    if (!sessionId || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      await submitRating(sessionId, message.message_id, newRating);
+      setRating(newRating);
+      onRatingChange?.(message.message_id, newRating);
+    } catch (error) {
+      console.error('Failed to submit rating:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [sessionId, message.message_id, isSubmitting, onRatingChange]);
 
   return (
     <div className={`flex w-full mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -87,6 +109,34 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isStreaming
                   </span>
                 ))}
             </p>
+          </div>
+        )}
+        {!isUser && !isStreaming && (
+          <div className="flex gap-2 mt-2 pt-2 border-t border-leesburg-brown/10">
+            <button
+              onClick={() => handleRating('up')}
+              disabled={isSubmitting}
+              className={`text-lg transition-colors ${
+                rating === 'up'
+                  ? 'text-green-500'
+                  : 'text-gray-400 hover:text-gray-600'
+              } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              aria-label="Thumbs up"
+            >
+              👍
+            </button>
+            <button
+              onClick={() => handleRating('down')}
+              disabled={isSubmitting}
+              className={`text-lg transition-colors ${
+                rating === 'down'
+                  ? 'text-red-500'
+                  : 'text-gray-400 hover:text-gray-600'
+              } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+              aria-label="Thumbs down"
+            >
+              👎
+            </button>
           </div>
         )}
       </div>

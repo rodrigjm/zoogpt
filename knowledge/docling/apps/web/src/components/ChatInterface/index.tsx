@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, lazy, Suspense, useCallback } from 'react';
 import { useSessionStore, useChatStore } from '../../stores';
-import { textToSpeech } from '../../lib/api';
+import { textToSpeech, submitSurvey } from '../../lib/api';
 import VoiceButton from '../VoiceButton';
 import ChatInput from '../ChatInput';
 import MessageBubble from '../MessageBubble';
@@ -16,6 +16,10 @@ type InputMode = 'voice' | 'text';
 export default function ChatInterface() {
   const [inputMode, setInputMode] = useState<InputMode>('voice');
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [hasThumbsDown, setHasThumbsDown] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Store state
@@ -98,6 +102,30 @@ export default function ChatInterface() {
     setInputMode((prev) => (prev === 'voice' ? 'text' : 'voice'));
   }, []);
 
+  // Handle rating change
+  const handleRatingChange = useCallback((messageId: string, rating: 'up' | 'down') => {
+    if (rating === 'down') {
+      setHasThumbsDown(true);
+    }
+  }, []);
+
+  // Handle feedback modal submit
+  const handleFeedbackSubmit = useCallback(async () => {
+    if (!sessionId || !feedbackText.trim()) return;
+
+    try {
+      await submitSurvey(sessionId, feedbackText.trim());
+      setFeedbackSubmitted(true);
+      setFeedbackText('');
+      setTimeout(() => {
+        setShowFeedbackModal(false);
+        setFeedbackSubmitted(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to submit feedback:', error);
+    }
+  }, [sessionId, feedbackText]);
+
   // Check if interaction is disabled
   const isDisabled = sessionLoading || isStreaming || !sessionId;
 
@@ -151,6 +179,7 @@ export default function ChatInterface() {
               key={msg.message_id}
               message={msg}
               sources={msg.role === 'assistant' ? sources : undefined}
+              onRatingChange={handleRatingChange}
             />
           ))}
 
@@ -200,6 +229,20 @@ export default function ChatInterface() {
         </div>
       )}
 
+      {/* Feedback Link */}
+      {messages.length > 0 && (
+        <div className="px-4 sm:px-6 py-2 text-center border-t border-leesburg-beige/50">
+          <button
+            onClick={() => setShowFeedbackModal(true)}
+            className={`text-sm text-leesburg-brown/60 hover:text-leesburg-brown transition-colors ${
+              hasThumbsDown ? 'animate-pulse' : ''
+            }`}
+          >
+            Share your thoughts
+          </button>
+        </div>
+      )}
+
       {/* Input Area */}
       <div className="px-4 sm:px-6 py-3 sm:py-4 bg-white border-t-2 border-leesburg-beige">
         {inputMode === 'voice' && sessionId ? (
@@ -219,6 +262,63 @@ export default function ChatInterface() {
           />
         )}
       </div>
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowFeedbackModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-leesburg-brown">Share Your Feedback</h2>
+              <button
+                onClick={() => setShowFeedbackModal(false)}
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+
+            {feedbackSubmitted ? (
+              <div className="text-center py-8">
+                <div className="text-4xl mb-2">✅</div>
+                <p className="text-leesburg-brown font-medium">Thank you for your feedback!</p>
+              </div>
+            ) : (
+              <>
+                <textarea
+                  value={feedbackText}
+                  onChange={(e) => setFeedbackText(e.target.value)}
+                  placeholder="Tell us what you think..."
+                  maxLength={2000}
+                  className="w-full h-32 px-4 py-3 border-2 border-leesburg-beige rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-leesburg-blue/50 text-leesburg-brown"
+                />
+                <div className="flex justify-between items-center mt-4">
+                  <span className="text-sm text-gray-500">
+                    {feedbackText.length} / 2000
+                  </span>
+                  <button
+                    onClick={handleFeedbackSubmit}
+                    disabled={!feedbackText.trim()}
+                    className={`px-6 py-2 rounded-full font-medium transition-all ${
+                      feedbackText.trim()
+                        ? 'bg-leesburg-blue text-white hover:bg-blue-500 active:scale-95'
+                        : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`}
+                  >
+                    Submit
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

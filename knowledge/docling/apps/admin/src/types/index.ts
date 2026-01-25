@@ -170,3 +170,31 @@ export interface UpdateAnimalImagesRequest {
   thumbnail?: string
   images?: string[]
 }
+
+// Feedback Types
+export interface FeedbackStats {
+  total_count: number
+  thumbs_up_count: number
+  thumbs_down_count: number
+  comment_count: number
+  flagged_count: number
+  positive_rate: number
+  daily_trends: Array<{
+    date: string
+    total: number
+    thumbs_up: number
+    thumbs_down: number
+  }>
+}
+
+export interface FeedbackItem {
+  id: number
+  session_id: string
+  interaction_id: number | null
+  type: 'thumbs_up' | 'thumbs_down' | 'comment'
+  comment: string | null
+  message_context: string | null
+  flagged: boolean
+  reviewed: boolean
+  created_at: string
+}

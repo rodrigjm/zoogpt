@@ -42,6 +42,7 @@ interface ChatState {
   followupQuestions: string[];
   confidence: number | null;
   error: string | null;
+  ratings: Map<string, 'up' | 'down'>;
 
   // Actions
   sendMessage: (sessionId: string, content: string) => Promise<void>;
@@ -49,6 +50,8 @@ interface ChatState {
   addMessage: (message: ChatMessage) => void;
   clearMessages: () => void;
   setError: (error: string | null) => void;
+  setRating: (messageId: string, rating: 'up' | 'down') => void;
+  getRating: (messageId: string) => 'up' | 'down' | null;
 }
 
 export const useChatStore = create<ChatState>()((set, get) => ({
@@ -61,6 +64,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   followupQuestions: [],
   confidence: null,
   error: null,
+  ratings: new Map(),
 
   // Send message (non-streaming)
   sendMessage: async (sessionId: string, content: string) => {
@@ -204,5 +208,19 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   // Set error state
   setError: (error) => {
     set({ error });
+  },
+
+  // Set rating for a message
+  setRating: (messageId: string, rating: 'up' | 'down') => {
+    set((state) => {
+      const newRatings = new Map(state.ratings);
+      newRatings.set(messageId, rating);
+      return { ratings: newRatings };
+    });
+  },
+
+  // Get rating for a message
+  getRating: (messageId: string) => {
+    return get().ratings.get(messageId) ?? null;
   },
 }));

@@ -142,3 +142,22 @@ export interface TTSWebSocketRequest {
 export interface HealthResponse {
   ok: boolean;
 }
+
+// ===== Feedback Types =====
+
+export interface RatingRequest {
+  session_id: string;
+  message_id: string;
+  rating: 'up' | 'down';
+}
+
+export interface SurveyRequest {
+  session_id: string;
+  comment: string;
+}
+
+export interface FeedbackResponse {
+  id: number;
+  created_at: string; // ISO-8601
+  success: boolean;
+}

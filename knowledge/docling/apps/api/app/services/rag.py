@@ -7,6 +7,7 @@ import re
 import json
 import httpx
 import lancedb
+from datetime import datetime
 from pathlib import Path
 from openai import OpenAI
 
@@ -94,6 +95,7 @@ class RAGService:
         self._openai_client = None
         self._llm_service = None
         self._animal_images = None
+        self._park_inventory = None
 
     @property
     def db(self):
@@ -139,6 +141,80 @@ class RAGService:
                 timed_print(f"  [RAG] Warning: Failed to parse animal_images.json: {e}")
                 self._animal_images = {}
         return self._animal_images
+
+    @property
+    def park_inventory(self) -> dict:
+        """Lazy-load park inventory data."""
+        if self._park_inventory is None:
+            config_path = Path(settings.lancedb_path).parent / "park_inventory.json"
+            try:
+                with open(config_path, "r") as f:
+                    self._park_inventory = json.load(f)
+                timed_print(f"  [RAG] Loaded park inventory: {len(self._park_inventory.get('animals_by_species', {}))} species")
+            except FileNotFoundError:
+                timed_print(f"  [RAG] Warning: park_inventory.json not found at {config_path}")
+                self._park_inventory = {"animals_by_species": {}, "animals_by_name": {}, "aliases": {}}
+            except json.JSONDecodeError as e:
+                timed_print(f"  [RAG] Warning: Failed to parse park_inventory.json: {e}")
+                self._park_inventory = {"animals_by_species": {}, "animals_by_name": {}, "aliases": {}}
+        return self._park_inventory
+
+    def _get_park_context(self, species_name: str) -> str | None:
+        """Get park-specific context for a species."""
+        species_key = species_name.lower().strip()
+
+        # Direct species match
+        if species_key in self.park_inventory.get("animals_by_species", {}):
+            data = self.park_inventory["animals_by_species"][species_key]
+            names = [i["name"] for i in data.get("individuals", [])[:5]]
+            locations = data.get("locations", [])
+
+            names_str = ", ".join(names) if names else "our animals"
+            locations_str = ", ".join(locations) if locations else "the park"
+
+            return f"[PARK INFO: Leesburg Animal Park has {data['count']} {species_key}{'s' if data['count'] > 1 else ''}! Their names include {names_str}. Find them at: {locations_str}.]"
+
+        # Check aliases
+        for main_species, alias_list in self.park_inventory.get("aliases", {}).items():
+            if species_key in [a.lower() for a in alias_list]:
+                return self._get_park_context(main_species)
+
+        return None
+
+    def _check_individual_name(self, query: str) -> str | None:
+        """Check if query contains an individual animal name and return context."""
+        query_lower = query.lower()
+        animals_by_name = self.park_inventory.get("animals_by_name", {})
+
+        for name, info in animals_by_name.items():
+            if name in query_lower:
+                species = info.get("species", "animal")
+                animal_type = info.get("type", species)
+                location = info.get("location", "the park")
+                gender = info.get("gender", "")
+                birthdate = info.get("birthdate", "")
+
+                # Calculate age if birthdate available
+                age_info = ""
+                if birthdate:
+                    try:
+                        # Handle formats like "06/16/2013" or "~01-01-2015"
+                        clean_date = birthdate.lstrip("~")
+                        for fmt in ["%m/%d/%Y", "%m-%d-%Y"]:
+                            try:
+                                birth = datetime.strptime(clean_date, fmt)
+                                age_years = (datetime.now() - birth).days // 365
+                                age_info = f" {name.title()} is {age_years} years old (born {birthdate})."
+                                break
+                            except ValueError:
+                                continue
+                    except Exception:
+                        pass
+
+                gender_info = f" ({gender})" if gender and gender != "Unknown" else ""
+                return f"[PARK INFO: {name.title()} is a {animal_type}{gender_info} at Leesburg Animal Park!{age_info} You can find {name.title()} at {location}.]"
+
+        return None
 
     def search_context(
         self, query: str, num_results: int = 5
@@ -199,6 +275,25 @@ class RAGService:
 
         # Join contexts
         context_string = "\n\n---\n\n".join(contexts)
+
+        # Append park-specific context if available
+        park_context = None
+
+        # First check if query mentions a specific individual
+        park_context = self._check_individual_name(query)
+
+        # If no individual match, check species from retrieved results
+        if not park_context:
+            for source in sources:
+                animal = source.get("animal", "")
+                if animal:
+                    park_context = self._get_park_context(animal)
+                    if park_context:
+                        break
+
+        if park_context:
+            context_string = context_string + "\n\n---\n\n" + park_context
+            timed_print(f"  [RAG] Added park inventory context")
 
         return context_string, sources, confidence
 

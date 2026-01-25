@@ -19,6 +19,9 @@ import type {
   HealthResponse,
   ApiError,
   StreamChunk,
+  RatingRequest,
+  SurveyRequest,
+  FeedbackResponse,
 } from '../types';
 
 const API_BASE = '/api';
@@ -340,6 +343,36 @@ export async function streamTextToSpeech(
       throw error;
     }
   }
+}
+
+// ===== Feedback API =====
+
+export async function submitRating(
+  sessionId: string,
+  messageId: string,
+  rating: 'up' | 'down'
+): Promise<{ id: number; created_at: string; success: boolean }> {
+  return apiFetch('/feedback/rating', {
+    method: 'POST',
+    body: JSON.stringify({
+      session_id: sessionId,
+      message_id: messageId,
+      rating,
+    }),
+  });
+}
+
+export async function submitSurvey(
+  sessionId: string,
+  comment: string
+): Promise<{ id: number; created_at: string; success: boolean }> {
+  return apiFetch('/feedback/survey', {
+    method: 'POST',
+    body: JSON.stringify({
+      session_id: sessionId,
+      comment,
+    }),
+  });
 }
 
 // ===== Health API =====

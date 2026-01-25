@@ -8,6 +8,7 @@ const navItems = [
   { to: '/interactions', label: 'Q&A Pairs', icon: '❓' },
   { to: '/knowledge-base', label: 'Knowledge Base', icon: '📚' },
   { to: '/images', label: 'Images', icon: '🖼️' },
+  { to: '/feedback', label: 'Feedback', icon: '📝' },
   { to: '/configuration', label: 'Configuration', icon: '⚙️' },
 ]
 

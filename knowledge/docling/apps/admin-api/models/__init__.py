@@ -3,3 +3,4 @@
 from .analytics import *
 from .kb import *
 from .config import *
+from .feedback import *

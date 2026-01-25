@@ -16,6 +16,7 @@ Test individual API endpoints.
 - `test_session_endpoints.py` - Session creation and retrieval tests
 - `test_chat_endpoints.py` - Chat endpoint tests
 - `test_voice_endpoints.py` - Voice STT/TTS endpoint tests
+- `test_kb_park_animals.py` - Park animal KB entry integration tests (new species, locations, individual names)
 
 ### Smoke Tests
 End-to-end integration tests that verify complete user flows across multiple endpoints.
@@ -65,6 +66,15 @@ pytest tests/test_integration_smoke.py::TestFullVoiceAssistantFlowSmoke
 pytest tests/test_integration_smoke.py::TestChatFlowSmoke::test_session_to_chat_flow -v
 ```
 
+### KB Park Animals Tests
+```bash
+# Run all KB park animal tests
+pytest apps/api/tests/test_kb_park_animals.py -v
+
+# Run specific test
+pytest apps/api/tests/test_kb_park_animals.py::test_new_species_cotton_top_tamarin -v
+```
+
 ## Test Coverage by Flow
 
 ### Smoke Tests Cover:
@@ -84,7 +94,12 @@ pytest tests/test_integration_smoke.py::TestChatFlowSmoke::test_session_to_chat_
 Tests can run inside the Docker container:
 
 ```bash
+# Run smoke tests
 docker-compose exec api pytest -m smoke
+
+# Run KB park animal tests (rebuild container first if new test added)
+docker-compose up -d --build api
+docker exec zoocari-api pytest tests/test_kb_park_animals.py -v
 ```
 
 ### GitHub Actions
