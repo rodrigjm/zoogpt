@@ -144,3 +144,29 @@ export interface Token {
   token_type: string
   expires_at: string
 }
+
+// Image Management Types
+export interface AnimalImageConfig {
+  thumbnail: string
+  images: string[]
+  alt: string
+}
+
+export interface AnimalImageDetail {
+  name: string
+  thumbnail: string
+  images: string[]
+  alt: string
+}
+
+export interface ImageUploadResponse {
+  filename: string
+  url: string
+  thumbnail_url: string | null
+}
+
+export interface UpdateAnimalImagesRequest {
+  alt?: string
+  thumbnail?: string
+  images?: string[]
+}

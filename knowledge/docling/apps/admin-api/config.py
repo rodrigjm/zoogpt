@@ -35,6 +35,8 @@ class AdminSettings(BaseSettings):
     session_db_path: str = "data/sessions.db"
     lancedb_path: str = "data/zoo_lancedb"
     admin_config_path: str = "data/admin_config.json"
+    animal_images_path: str = "data/animal_images.json"
+    image_storage_path: str = "apps/web/public/images/animals"
 
     # OpenAI (for KB index rebuilding)
     openai_api_key: str
@@ -60,6 +62,30 @@ class AdminSettings(BaseSettings):
             current = Path(__file__).resolve()
             for parent in current.parents:
                 target = parent / self.lancedb_path
+                if target.exists():
+                    return target
+        return path
+
+    @property
+    def animal_images_absolute(self) -> Path:
+        """Get absolute path to animal_images.json."""
+        path = Path(self.animal_images_path)
+        if not path.is_absolute():
+            current = Path(__file__).resolve()
+            for parent in current.parents:
+                target = parent / self.animal_images_path
+                if target.exists():
+                    return target
+        return path
+
+    @property
+    def image_storage_absolute(self) -> Path:
+        """Get absolute path to image storage directory."""
+        path = Path(self.image_storage_path)
+        if not path.is_absolute():
+            current = Path(__file__).resolve()
+            for parent in current.parents:
+                target = parent / self.image_storage_path
                 if target.exists():
                     return target
         return path

@@ -15,7 +15,7 @@ const AnimalImageGallery: React.FC<AnimalImageGalleryProps> = ({
   thumbnail,
   alt
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Don't render if no images

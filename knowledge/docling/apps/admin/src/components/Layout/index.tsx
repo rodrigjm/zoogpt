@@ -7,6 +7,7 @@ const navItems = [
   { to: '/sessions', label: 'Sessions', icon: '💬' },
   { to: '/interactions', label: 'Q&A Pairs', icon: '❓' },
   { to: '/knowledge-base', label: 'Knowledge Base', icon: '📚' },
+  { to: '/images', label: 'Images', icon: '🖼️' },
   { to: '/configuration', label: 'Configuration', icon: '⚙️' },
 ]
 

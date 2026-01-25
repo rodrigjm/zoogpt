@@ -146,3 +146,47 @@ export const configApi = {
   getFullConfig: () =>
     api<import('../types').FullConfig>('/config/full'),
 }
+
+// Images API
+export const imagesApi = {
+  getAnimals: () =>
+    api<{ animals: Record<string, import('../types').AnimalImageConfig> }>('/images/animals'),
+
+  getAnimal: (name: string) =>
+    api<import('../types').AnimalImageDetail>(`/images/animals/${encodeURIComponent(name)}`),
+
+  updateAnimal: (name: string, data: import('../types').UpdateAnimalImagesRequest) =>
+    api<import('../types').AnimalImageDetail>(`/images/animals/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  uploadImage: async (name: string, file: File): Promise<import('../types').ImageUploadResponse> => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const { token } = useAuthStore.getState()
+    const response = await fetch(`${API_BASE}/images/animals/${encodeURIComponent(name)}/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ detail: 'Upload failed' }))
+      throw new ApiError(response.status, error.detail || 'Upload failed')
+    }
+
+    return response.json()
+  },
+
+  deleteImage: (name: string, filename: string) =>
+    fetchWithAuth(`/images/animals/${encodeURIComponent(name)}/${encodeURIComponent(filename)}`, {
+      method: 'DELETE',
+    }),
+
+  syncImages: () =>
+    api<{ ok: boolean; added: string[]; removed: string[]; total_files: number }>('/images/sync', { method: 'POST' }),
+}

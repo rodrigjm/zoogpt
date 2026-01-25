@@ -14,7 +14,7 @@ from fastapi.security import HTTPBasicCredentials
 
 from config import settings
 from auth import login_for_access_token, get_current_user, User, Token, basic_security
-from routers import analytics_router, kb_router, config_router
+from routers import analytics_router, kb_router, config_router, images_router
 
 
 logging.basicConfig(level=logging.INFO)
@@ -89,6 +89,7 @@ async def health_check():
 app.include_router(analytics_router, prefix="/api/admin")
 app.include_router(kb_router, prefix="/api/admin")
 app.include_router(config_router, prefix="/api/admin")
+app.include_router(images_router, prefix="/api/admin")
 
 
 # =============================================================================

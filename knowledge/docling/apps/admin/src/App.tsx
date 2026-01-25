@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Sessions from './pages/Sessions'
 import Interactions from './pages/Interactions'
 import KnowledgeBase from './pages/KnowledgeBase'
+import Images from './pages/Images'
 import Configuration from './pages/Configuration'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -32,6 +33,7 @@ export default function App() {
                 <Route path="/sessions" element={<Sessions />} />
                 <Route path="/interactions" element={<Interactions />} />
                 <Route path="/knowledge-base" element={<KnowledgeBase />} />
+                <Route path="/images" element={<Images />} />
                 <Route path="/configuration" element={<Configuration />} />
               </Routes>
             </Layout>

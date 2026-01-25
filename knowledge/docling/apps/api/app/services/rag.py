@@ -176,8 +176,10 @@ class RAGService:
             source = {"animal": animal_name, "title": title, "url": url}
 
             # Add image data if this animal has configured images
-            if animal_name in self.animal_images:
-                image_data = self.animal_images[animal_name]
+            # Normalize animal name: "african_elephant" -> "African Elephant"
+            normalized_name = animal_name.replace("_", " ").title()
+            if normalized_name in self.animal_images:
+                image_data = self.animal_images[normalized_name]
                 source["thumbnail"] = image_data.get("thumbnail")
                 source["image_urls"] = image_data.get("images", [])
                 source["alt"] = image_data.get("alt")

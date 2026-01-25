@@ -8,6 +8,7 @@ passlib[bcrypt]>=1.7.4
 python-multipart>=0.0.6
 lancedb>=0.4.0
 openai>=1.10.0
+Pillow>=10.0.0
 
 # Testing
 pytest>=7.4.0
