@@ -73,3 +73,10 @@ class IndexRebuildResponse(BaseModel):
     job_id: str
     status: str
     started_at: datetime
+
+
+class IndexPendingStatus(BaseModel):
+    """Pending changes status for auto-rebuild."""
+    pending: bool
+    last_change_at: Optional[datetime] = None
+    auto_rebuild_in_seconds: Optional[int] = None

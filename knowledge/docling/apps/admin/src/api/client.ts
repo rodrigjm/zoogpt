@@ -119,6 +119,9 @@ export const kbApi = {
   getIndexStatus: () =>
     api<import('../types').IndexStatus>('/kb/index/status'),
 
+  getIndexPending: () =>
+    api<import('../types').IndexPendingStatus>('/kb/index/pending'),
+
   rebuildIndex: () =>
     api<{ job_id: string; status: string; started_at: string }>('/kb/index/rebuild', { method: 'POST' }),
 }

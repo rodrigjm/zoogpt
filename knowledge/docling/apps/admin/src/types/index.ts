@@ -100,6 +100,12 @@ export interface IndexStatus {
   error_message: string | null
 }
 
+export interface IndexPendingStatus {
+  pending: boolean
+  last_change_at: string | null
+  auto_rebuild_in_seconds: number | null
+}
+
 // Configuration Types
 export interface PromptsConfig {
   system_prompt: string

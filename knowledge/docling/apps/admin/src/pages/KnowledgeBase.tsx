@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { kbApi } from '../api/client'
-import type { Animal, IndexStatus } from '../types'
+import type { Animal, IndexStatus, IndexPendingStatus } from '../types'
 import { AnimalModal, DeleteConfirmModal, SourcesPanel } from '../components/KnowledgeBase'
 
 export default function KnowledgeBase() {
   const [animals, setAnimals] = useState<Animal[]>([])
   const [indexStatus, setIndexStatus] = useState<IndexStatus | null>(null)
+  const [pendingStatus, setPendingStatus] = useState<IndexPendingStatus | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isRebuilding, setIsRebuilding] = useState(false)
+  const [rebuildToast, setRebuildToast] = useState<string | null>(null)
+  const prevStatusRef = useRef<string | null>(null)
 
   // Modal states
   const [isAnimalModalOpen, setIsAnimalModalOpen] = useState(false)
@@ -19,9 +22,53 @@ export default function KnowledgeBase() {
   const [selectedAnimalId, setSelectedAnimalId] = useState<number | null>(null)
   const [selectedAnimalName, setSelectedAnimalName] = useState('')
 
+  // Fetch pending status
+  const fetchPendingStatus = useCallback(async () => {
+    try {
+      const pending = await kbApi.getIndexPending()
+      setPendingStatus(pending)
+    } catch {
+      // Silent fail for pending status
+    }
+  }, [])
+
+  // Fetch index status
+  const fetchIndexStatus = useCallback(async () => {
+    try {
+      const status = await kbApi.getIndexStatus()
+      // Check for transition from rebuilding to completed
+      if (prevStatusRef.current === 'rebuilding' && status.status !== 'rebuilding') {
+        if (status.status === 'ready' || status.status === 'completed') {
+          setRebuildToast('Index rebuild completed successfully!')
+          setTimeout(() => setRebuildToast(null), 5000)
+        }
+        setIsRebuilding(false)
+      }
+      prevStatusRef.current = status.status
+      setIndexStatus(status)
+    } catch {
+      // Silent fail for status polling
+    }
+  }, [])
+
   useEffect(() => {
     fetchData()
   }, [])
+
+  // Poll for pending changes every 5 seconds
+  useEffect(() => {
+    fetchPendingStatus()
+    const interval = setInterval(fetchPendingStatus, 5000)
+    return () => clearInterval(interval)
+  }, [fetchPendingStatus])
+
+  // Poll during rebuild every 2 seconds
+  useEffect(() => {
+    if (indexStatus?.status !== 'rebuilding' && !isRebuilding) return
+
+    const poll = setInterval(fetchIndexStatus, 2000)
+    return () => clearInterval(poll)
+  }, [indexStatus?.status, isRebuilding, fetchIndexStatus])
 
   async function fetchData() {
     try {
@@ -43,12 +90,14 @@ export default function KnowledgeBase() {
     setIsRebuilding(true)
     try {
       await kbApi.rebuildIndex()
+      // Clear pending status immediately (backend clears it too)
+      setPendingStatus({ pending: false, last_change_at: null, auto_rebuild_in_seconds: null })
       // Refresh status
       const status = await kbApi.getIndexStatus()
       setIndexStatus(status)
+      prevStatusRef.current = status.status
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start rebuild')
-    } finally {
       setIsRebuilding(false)
     }
   }
@@ -108,46 +157,77 @@ export default function KnowledgeBase() {
 
   return (
     <div className="space-y-6">
+      {/* Success Toast */}
+      {rebuildToast && (
+        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+          {rebuildToast}
+        </div>
+      )}
+
       <div className="flex justify-between items-start">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Knowledge Base</h1>
           <p className="text-gray-500">Manage animals and source documents</p>
         </div>
-        <button
-          onClick={handleRebuildIndex}
-          disabled={isRebuilding || indexStatus?.status === 'rebuilding'}
-          className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50"
-        >
-          {isRebuilding || indexStatus?.status === 'rebuilding'
-            ? 'Rebuilding...'
-            : 'Rebuild Index'}
-        </button>
+        <div className="flex items-center gap-2">
+          {pendingStatus?.pending && (
+            <span className="text-sm text-yellow-600 bg-yellow-50 px-2 py-1 rounded">
+              Auto-rebuild in {pendingStatus.auto_rebuild_in_seconds}s
+            </span>
+          )}
+          <button
+            onClick={handleRebuildIndex}
+            disabled={isRebuilding || indexStatus?.status === 'rebuilding'}
+            className={`px-4 py-2 text-white rounded-lg disabled:opacity-50 ${
+              pendingStatus?.pending
+                ? 'bg-yellow-500 hover:bg-yellow-600 animate-pulse'
+                : 'bg-primary-600 hover:bg-primary-700'
+            }`}
+          >
+            {isRebuilding || indexStatus?.status === 'rebuilding'
+              ? 'Rebuilding...'
+              : pendingStatus?.pending
+              ? 'Rebuild Now'
+              : 'Rebuild Index'}
+          </button>
+        </div>
       </div>
 
       {/* Index Status */}
       <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center gap-4">
-          <div
-            className={`w-3 h-3 rounded-full ${
-              indexStatus?.status === 'ready'
-                ? 'bg-green-500'
-                : indexStatus?.status === 'rebuilding'
-                ? 'bg-yellow-500 animate-pulse'
-                : 'bg-red-500'
-            }`}
-          />
-          <div>
-            <p className="font-medium">
-              Index Status:{' '}
-              <span className="capitalize">{indexStatus?.status || 'unknown'}</span>
-            </p>
-            <p className="text-sm text-gray-500">
-              {indexStatus?.document_count || 0} documents, {indexStatus?.chunk_count || 0} chunks
-              {indexStatus?.last_rebuild && (
-                <> | Last rebuilt: {new Date(indexStatus.last_rebuild).toLocaleString()}</>
-              )}
-            </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div
+              className={`w-3 h-3 rounded-full ${
+                indexStatus?.status === 'ready'
+                  ? 'bg-green-500'
+                  : indexStatus?.status === 'rebuilding'
+                  ? 'bg-yellow-500 animate-pulse'
+                  : 'bg-red-500'
+              }`}
+            />
+            <div>
+              <p className="font-medium">
+                Index Status:{' '}
+                <span className="capitalize">{indexStatus?.status || 'unknown'}</span>
+              </p>
+              <p className="text-sm text-gray-500">
+                {indexStatus?.document_count || 0} documents, {indexStatus?.chunk_count || 0} chunks
+                {indexStatus?.last_rebuild && (
+                  <> | Last rebuilt: {new Date(indexStatus.last_rebuild).toLocaleString()}</>
+                )}
+              </p>
+            </div>
           </div>
+          {pendingStatus?.pending && (
+            <div className="flex items-center gap-2 text-sm text-yellow-600">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+              <span>Changes pending</span>
+            </div>
+          )}
         </div>
       </div>
 

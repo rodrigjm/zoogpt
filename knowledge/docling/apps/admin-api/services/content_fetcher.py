@@ -21,6 +21,120 @@ PARK_INVENTORY_PATH = os.environ.get(
     str(Path(__file__).parent.parent.parent.parent / "data" / "park_inventory.json")
 )
 
+# Popular animals kids love (not at park but educational)
+POPULAR_ANIMALS = [
+    # Big Cats
+    {"name": "lion", "display_name": "Lion", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/lion"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/lion/")]},
+    {"name": "tiger", "display_name": "Tiger", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/tiger"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/tiger/")]},
+    {"name": "cheetah", "display_name": "Cheetah", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/cheetah"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/cheetah/")]},
+    {"name": "leopard", "display_name": "Leopard", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/leopard"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/leopard/")]},
+    {"name": "jaguar", "display_name": "Jaguar", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/jaguar"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/jaguar/")]},
+    # Large Mammals
+    {"name": "elephant", "display_name": "Elephant", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/elephant"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/elephant/")]},
+    {"name": "giraffe", "display_name": "Giraffe", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/giraffe"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/giraffe/")]},
+    {"name": "hippopotamus", "display_name": "Hippopotamus", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/hippo"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/hippopotamus/")]},
+    {"name": "rhinoceros", "display_name": "Rhinoceros", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/rhinoceros"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/rhinoceros/")]},
+    {"name": "zebra", "display_name": "Zebra", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/zebra"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/zebra/")]},
+    # Bears
+    {"name": "polar_bear", "display_name": "Polar Bear", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/polar-bear"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/polar-bear/")]},
+    {"name": "grizzly_bear", "display_name": "Grizzly Bear", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/grizzly-bear"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/grizzly-bear/")]},
+    {"name": "panda", "display_name": "Giant Panda", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/giant-panda"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/giant-panda/")]},
+    # Primates
+    {"name": "gorilla", "display_name": "Gorilla", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/gorilla"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/gorilla/")]},
+    {"name": "chimpanzee", "display_name": "Chimpanzee", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/chimpanzee"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/chimpanzee/")]},
+    {"name": "orangutan", "display_name": "Orangutan", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/orangutan"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/orangutan/")]},
+    # Marine/Aquatic
+    {"name": "dolphin", "display_name": "Dolphin", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/dolphin"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/dolphin/")]},
+    {"name": "whale", "display_name": "Whale", "category": "popular",
+     "sources": [("A-Z Animals", "https://a-z-animals.com/animals/whale/")]},
+    {"name": "shark", "display_name": "Shark", "category": "popular",
+     "sources": [("A-Z Animals", "https://a-z-animals.com/animals/shark/")]},
+    {"name": "sea_turtle", "display_name": "Sea Turtle", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/sea-turtle"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/sea-turtle/")]},
+    {"name": "penguin", "display_name": "Penguin", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/penguin"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/penguin/")]},
+    {"name": "seal", "display_name": "Seal", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/seal-sea-lion"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/seal/")]},
+    {"name": "otter", "display_name": "Otter", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/otter"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/otter/")]},
+    # Other Kid Favorites
+    {"name": "wolf", "display_name": "Wolf", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/wolf"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/wolf/")]},
+    {"name": "fox", "display_name": "Fox", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/fox"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/fox/")]},
+    {"name": "kangaroo", "display_name": "Kangaroo", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/kangaroo"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/kangaroo/")]},
+    {"name": "koala", "display_name": "Koala", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/koala"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/koala/")]},
+    {"name": "crocodile", "display_name": "Crocodile", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/crocodilian"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/crocodile/")]},
+    {"name": "alligator", "display_name": "Alligator", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/american-alligator"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/alligator/")]},
+    {"name": "snake", "display_name": "Snake", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/snake"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/snake/")]},
+    {"name": "owl", "display_name": "Owl", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/owl"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/owl/")]},
+    {"name": "eagle", "display_name": "Eagle", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/eagle"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/eagle/")]},
+    {"name": "flamingo", "display_name": "Flamingo", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/flamingo"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/flamingo/")]},
+    {"name": "parrot", "display_name": "Parrot", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/parrot"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/parrot/")]},
+    # Dinosaur-adjacent (kids love these)
+    {"name": "komodo_dragon", "display_name": "Komodo Dragon", "category": "popular",
+     "sources": [("San Diego Zoo", "https://animals.sandiegozoo.org/animals/komodo-dragon"),
+                 ("A-Z Animals", "https://a-z-animals.com/animals/komodo-dragon/")]},
+]
+
 # Park animals with their web sources
 PARK_ANIMALS = [
     {"name": "cotton_top_tamarin", "display_name": "Cotton-top Tamarin", "category": "park_animal",
@@ -312,22 +426,25 @@ class ContentFetcher:
         self.conn.commit()
         return cursor.lastrowid
 
-    def get_animals_without_sources(self) -> list[dict]:
-        """Get animals from PARK_ANIMALS that aren't in KB or have no sources."""
+    def get_animals_without_external_sources(self) -> list[dict]:
+        """Get animals from PARK_ANIMALS + POPULAR_ANIMALS that need external sources."""
         cursor = self.conn.cursor()
 
-        # Get existing animals with sources
+        # Get existing animals with external sources (not park inventory)
         cursor.execute("""
             SELECT a.name, COUNT(s.id) as source_count
             FROM kb_animals a
-            LEFT JOIN kb_sources s ON a.id = s.animal_id
+            LEFT JOIN kb_sources s ON a.id = s.animal_id AND s.title != 'Leesburg Animal Park'
             GROUP BY a.name
         """)
         existing = {row[0]: row[1] for row in cursor.fetchall()}
 
-        # Find animals that need content
+        # Combine park animals and popular animals
+        all_animals = PARK_ANIMALS + POPULAR_ANIMALS
+
+        # Find animals that need external content
         animals_to_fetch = []
-        for animal in PARK_ANIMALS:
+        for animal in all_animals:
             name = animal["name"]
             if name not in existing or existing[name] == 0:
                 animals_to_fetch.append(animal)
@@ -398,7 +515,7 @@ class ContentFetcher:
         Returns:
             Tuple of (animals_added, animals_failed)
         """
-        animals_to_fetch = self.get_animals_without_sources()
+        animals_to_fetch = self.get_animals_without_external_sources()
 
         if not animals_to_fetch:
             logger.info("All animals already have external sources")

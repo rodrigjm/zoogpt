@@ -6,8 +6,9 @@ import os
 import sqlite3
 import json
 import uuid
+import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from models.kb import (
     SourceResponse,
     IndexStatus,
     IndexRebuildResponse,
+    IndexPendingStatus,
 )
 from services.indexer import IndexerService
 
@@ -33,6 +35,78 @@ from services.indexer import IndexerService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/kb", tags=["knowledge-base"])
+
+# =============================================================================
+# Auto-Rebuild State Management
+# =============================================================================
+
+DEBOUNCE_SECONDS = 30  # Wait 30 seconds after last change before auto-rebuild
+
+_rebuild_state = {
+    "changes_pending": False,
+    "last_change_at": None,
+    "debounce_task": None,
+}
+
+
+async def schedule_debounced_rebuild():
+    """Wait for debounce period, then trigger rebuild if still pending."""
+    try:
+        await asyncio.sleep(DEBOUNCE_SECONDS)
+        if _rebuild_state["changes_pending"]:
+            logger.info("Auto-rebuild triggered after debounce period")
+            # Create job in database
+            conn = get_db_connection()
+            try:
+                cursor = conn.cursor()
+
+                # Check if rebuild already running
+                cursor.execute("""
+                    SELECT job_id FROM kb_index_history
+                    WHERE status = 'running'
+                """)
+                if cursor.fetchone():
+                    logger.info("Skipping auto-rebuild - rebuild already in progress")
+                    return
+
+                job_id = str(uuid.uuid4())
+                started_at = datetime.utcnow()
+
+                cursor.execute(
+                    """INSERT INTO kb_index_history (job_id, started_at, status)
+                       VALUES (?, ?, 'running')""",
+                    (job_id, started_at),
+                )
+                conn.commit()
+
+                # Run the rebuild
+                await run_index_rebuild(job_id)
+
+            finally:
+                conn.close()
+
+            _rebuild_state["changes_pending"] = False
+            _rebuild_state["last_change_at"] = None
+    except asyncio.CancelledError:
+        logger.debug("Debounced rebuild cancelled (new changes detected)")
+    except Exception as e:
+        logger.error(f"Auto-rebuild failed: {e}", exc_info=True)
+
+
+def mark_changes_pending():
+    """Called after any source CRUD operation to schedule auto-rebuild."""
+    _rebuild_state["changes_pending"] = True
+    _rebuild_state["last_change_at"] = datetime.utcnow()
+
+    # Cancel existing debounce task
+    if _rebuild_state["debounce_task"] and not _rebuild_state["debounce_task"].done():
+        _rebuild_state["debounce_task"].cancel()
+
+    # Start new debounce timer
+    _rebuild_state["debounce_task"] = asyncio.create_task(
+        schedule_debounced_rebuild()
+    )
+    logger.info(f"Changes pending, auto-rebuild scheduled in {DEBOUNCE_SECONDS}s")
 
 
 def get_db_connection():
@@ -318,15 +392,23 @@ async def delete_animal(
     try:
         cursor = conn.cursor()
 
-        cursor.execute("SELECT id FROM kb_animals WHERE id = ?", (animal_id,))
-        if not cursor.fetchone():
+        # Check if animal exists and has sources
+        cursor.execute("SELECT id, source_count FROM kb_animals WHERE id = ?", (animal_id,))
+        row = cursor.fetchone()
+        if not row:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Animal with id {animal_id} not found",
             )
 
+        has_sources = row["source_count"] > 0
+
         cursor.execute("DELETE FROM kb_animals WHERE id = ?", (animal_id,))
         conn.commit()
+
+        # Mark changes pending if animal had sources (affects vector index)
+        if has_sources:
+            mark_changes_pending()
     finally:
         conn.close()
 
@@ -372,6 +454,9 @@ async def add_source(
         cursor.execute("SELECT * FROM kb_sources WHERE id = ?", (source_id,))
         row = cursor.fetchone()
 
+        # Mark changes pending for auto-rebuild
+        mark_changes_pending()
+
         return SourceResponse(
             id=row["id"],
             title=row["title"],
@@ -415,6 +500,9 @@ async def delete_source(
             (animal_id,),
         )
         conn.commit()
+
+        # Mark changes pending for auto-rebuild
+        mark_changes_pending()
     finally:
         conn.close()
 
@@ -458,6 +546,27 @@ async def get_index_status(
         conn.close()
 
 
+@router.get("/index/pending", response_model=IndexPendingStatus)
+async def get_index_pending_status(
+    user: User = Depends(get_current_user),
+):
+    """Check if there are pending changes requiring index rebuild."""
+    pending = _rebuild_state["changes_pending"]
+    last_change_at = _rebuild_state["last_change_at"]
+
+    auto_rebuild_in_seconds = None
+    if pending and last_change_at:
+        elapsed = (datetime.utcnow() - last_change_at).total_seconds()
+        remaining = max(0, int(DEBOUNCE_SECONDS - elapsed))
+        auto_rebuild_in_seconds = remaining
+
+    return IndexPendingStatus(
+        pending=pending,
+        last_change_at=last_change_at,
+        auto_rebuild_in_seconds=auto_rebuild_in_seconds,
+    )
+
+
 @router.post("/index/rebuild", response_model=IndexRebuildResponse)
 async def rebuild_index(
     background_tasks: BackgroundTasks,
@@ -468,6 +577,12 @@ async def rebuild_index(
 
     This runs in the background. Check /index/status for progress.
     """
+    # Clear pending state since we're doing a manual rebuild
+    if _rebuild_state["debounce_task"] and not _rebuild_state["debounce_task"].done():
+        _rebuild_state["debounce_task"].cancel()
+    _rebuild_state["changes_pending"] = False
+    _rebuild_state["last_change_at"] = None
+
     # Check for OpenAI API key first
     api_key = os.environ.get("OPENAI_API_KEY") or getattr(settings, "openai_api_key", None)
     if not api_key:
