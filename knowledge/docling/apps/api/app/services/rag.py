@@ -161,7 +161,9 @@ class RAGService:
 
     def _get_park_context(self, species_name: str) -> str | None:
         """Get park-specific context for a species."""
-        species_key = species_name.lower().strip()
+        # Normalize: lowercase, strip, and convert underscores to spaces
+        # (KB uses underscores like "squirrel_monkey", inventory uses spaces like "squirrel monkey")
+        species_key = species_name.lower().strip().replace("_", " ")
 
         # Direct species match
         if species_key in self.park_inventory.get("animals_by_species", {}):

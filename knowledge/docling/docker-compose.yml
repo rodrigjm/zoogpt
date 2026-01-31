@@ -138,6 +138,9 @@ services:
     container_name: zoocari-web
     ports:
       - "3000:80"
+    volumes:
+      # Mount images directory for dynamic uploads
+      - ./apps/web/public/images/animals:/usr/share/nginx/html/images/animals
     depends_on:
       - api
     restart: unless-stopped
@@ -181,6 +184,7 @@ services:
       - "8001:8000"
     volumes:
       - ./data:/app/data
+      - ./apps/web/public/images/animals:/app/images/animals
     environment:
       - PYTHONUNBUFFERED=1
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
@@ -189,6 +193,7 @@ services:
       - SESSION_DB_PATH=/app/data/sessions.db
       - LANCEDB_PATH=/app/data/zoo_lancedb
       - CONFIG_PATH=/app/data/admin_config.json
+      - IMAGE_STORAGE_PATH=/app/images/animals
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     env_file:
       - path: .env

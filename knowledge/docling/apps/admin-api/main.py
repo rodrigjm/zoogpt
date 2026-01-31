@@ -4,10 +4,14 @@ Provides analytics, knowledge base management, and configuration endpoints.
 """
 
 import logging
+import mimetypes
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Depends
+
+# Register webp MIME type (not in Python's default mimetypes)
+mimetypes.add_type("image/webp", ".webp")
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBasicCredentials
@@ -94,9 +98,16 @@ app.include_router(feedback_router, prefix="/api/admin")
 
 
 # =============================================================================
-# Static Files (React SPA)
+# Static Files
 # =============================================================================
 
+# Mount animal images directory for admin portal (must come BEFORE catch-all SPA mount)
+image_dir = settings.image_storage_absolute
+if image_dir.exists():
+    app.mount("/images/animals", StaticFiles(directory=str(image_dir)), name="animal-images")
+    logger.info(f"Serving images from: {image_dir}")
+
+# React SPA (catch-all - must be last)
 static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 
 interface AnimalImageProps {
   src: string;
@@ -9,31 +9,6 @@ interface AnimalImageProps {
 const AnimalImage: React.FC<AnimalImageProps> = ({ src, alt, onClick }) => {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && imgRef.current && !loaded) {
-            const img = imgRef.current;
-            img.src = src;
-          }
-        });
-      },
-      { rootMargin: '50px' }
-    );
-
-    if (imgRef.current) {
-      observer.observe(imgRef.current);
-    }
-
-    return () => {
-      if (imgRef.current) {
-        observer.unobserve(imgRef.current);
-      }
-    };
-  }, [src, loaded]);
 
   const handleLoad = () => {
     setLoaded(true);
@@ -65,7 +40,7 @@ const AnimalImage: React.FC<AnimalImageProps> = ({ src, alt, onClick }) => {
         <div className="absolute inset-0 animate-pulse bg-leesburg-beige" />
       )}
       <img
-        ref={imgRef}
+        src={src}
         alt={alt}
         onLoad={handleLoad}
         onError={handleError}
