@@ -36,9 +36,9 @@ export default function KnowledgeBase() {
   const fetchIndexStatus = useCallback(async () => {
     try {
       const status = await kbApi.getIndexStatus()
-      // Check for transition from rebuilding to completed
+      // Check for transition from rebuilding to ready/failed
       if (prevStatusRef.current === 'rebuilding' && status.status !== 'rebuilding') {
-        if (status.status === 'ready' || status.status === 'completed') {
+        if (status.status === 'ready') {
           setRebuildToast('Index rebuild completed successfully!')
           setTimeout(() => setRebuildToast(null), 5000)
         }
