@@ -164,24 +164,43 @@ class RAGService:
         # Normalize: lowercase, strip, and convert underscores to spaces
         # (KB uses underscores like "squirrel_monkey", inventory uses spaces like "squirrel monkey")
         species_key = species_name.lower().strip().replace("_", " ")
+        animals_by_species = self.park_inventory.get("animals_by_species", {})
 
         # Direct species match
-        if species_key in self.park_inventory.get("animals_by_species", {}):
-            data = self.park_inventory["animals_by_species"][species_key]
-            names = [i["name"] for i in data.get("individuals", [])[:5]]
-            locations = data.get("locations", [])
-
-            names_str = ", ".join(names) if names else "our animals"
-            locations_str = ", ".join(locations) if locations else "the park"
-
-            return f"[PARK INFO: Leesburg Animal Park has {data['count']} {species_key}{'s' if data['count'] > 1 else ''}! Their names include {names_str}. Find them at: {locations_str}.]"
+        if species_key in animals_by_species:
+            return self._format_park_context(species_key, animals_by_species[species_key])
 
         # Check aliases
         for main_species, alias_list in self.park_inventory.get("aliases", {}).items():
             if species_key in [a.lower() for a in alias_list]:
                 return self._get_park_context(main_species)
 
+        # Fuzzy match: check if any word in the species name matches a park species
+        # e.g., "african crested porcupine" contains "porcupine" which is in park
+        species_words = species_key.split()
+        for word in species_words:
+            if len(word) >= 4 and word in animals_by_species:  # Skip short words
+                timed_print(f"  [RAG] Fuzzy park match: '{species_key}' -> '{word}'")
+                return self._format_park_context(word, animals_by_species[word])
+
+        # Reverse fuzzy: check if any park species is contained in the query
+        # e.g., "hedgehog" matches "four toed hedgehog"
+        for park_species in animals_by_species:
+            if len(park_species) >= 4 and park_species in species_key:
+                timed_print(f"  [RAG] Reverse fuzzy park match: '{species_key}' contains '{park_species}'")
+                return self._format_park_context(park_species, animals_by_species[park_species])
+
         return None
+
+    def _format_park_context(self, species_key: str, data: dict) -> str:
+        """Format park context string for a species."""
+        names = [i["name"] for i in data.get("individuals", [])[:5]]
+        locations = data.get("locations", [])
+
+        names_str = ", ".join(names) if names else "our animals"
+        locations_str = ", ".join(locations) if locations else "the park"
+
+        return f"[PARK INFO: Leesburg Animal Park has {data['count']} {species_key}{'s' if data['count'] > 1 else ''}! Their names include {names_str}. Find them at: {locations_str}.]"
 
     def _check_individual_name(self, query: str) -> str | None:
         """Check if query contains an individual animal name and return context."""
