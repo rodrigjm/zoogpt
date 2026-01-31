@@ -2,9 +2,11 @@
 Knowledge Base management API endpoints.
 """
 
+import os
 import sqlite3
 import json
 import uuid
+import logging
 from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
@@ -27,6 +29,8 @@ from models.kb import (
 )
 from services.indexer import IndexerService
 
+# Configure logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/kb", tags=["knowledge-base"])
 
@@ -464,6 +468,14 @@ async def rebuild_index(
 
     This runs in the background. Check /index/status for progress.
     """
+    # Check for OpenAI API key first
+    api_key = os.environ.get("OPENAI_API_KEY") or getattr(settings, "openai_api_key", None)
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="OPENAI_API_KEY not configured. Cannot generate embeddings.",
+        )
+
     conn = get_db_connection()
     try:
         cursor = conn.cursor()
@@ -512,15 +524,18 @@ async def run_index_rebuild(job_id: str):
     3. Generate embeddings via OpenAI
     4. Write to LanceDB
     """
+    logger.info(f"Starting index rebuild job: {job_id}")
     conn = get_db_connection()
+    cursor = conn.cursor()
     try:
-        cursor = conn.cursor()
-
         # Initialize indexer service
         indexer = IndexerService(conn)
+        logger.info("IndexerService initialized")
 
         # Run the rebuild process
+        logger.info("Running rebuild...")
         total_documents, total_chunks = indexer.rebuild_index()
+        logger.info(f"Rebuild complete: {total_documents} docs, {total_chunks} chunks")
 
         # Update job status
         cursor.execute(
@@ -533,7 +548,9 @@ async def run_index_rebuild(job_id: str):
             (total_documents, total_chunks, job_id),
         )
         conn.commit()
+        logger.info(f"Job {job_id} completed successfully")
     except Exception as e:
+        logger.error(f"Index rebuild failed: {type(e).__name__}: {e}", exc_info=True)
         cursor.execute(
             """UPDATE kb_index_history
                SET status = 'failed',

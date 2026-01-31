@@ -4,11 +4,14 @@ Vector indexer service for rebuilding LanceDB from SQLite sources.
 
 import os
 import sqlite3
+import logging
 from typing import List, Dict
 import lancedb
 from lancedb.embeddings import get_registry
 from lancedb.pydantic import LanceModel, Vector
 
+
+logger = logging.getLogger(__name__)
 
 # LanceDB settings
 DB_PATH = os.environ.get("LANCEDB_PATH", "data/zoo_lancedb")
@@ -120,10 +123,18 @@ class IndexerService:
         Returns:
             Number of chunks written
         """
+        # Check API key is available for LanceDB's OpenAI integration
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
+        logger.info(f"Using OpenAI API key: {api_key[:8]}...{api_key[-4:]}")
+        logger.info(f"LanceDB path: {DB_PATH}")
+
         # Create database connection
         db = lancedb.connect(DB_PATH)
 
         # Get OpenAI embedding function (text-embedding-3-large as per zoo_build_knowledge.py)
+        logger.info("Creating OpenAI embedding function...")
         func = get_registry().get("openai").create(name="text-embedding-3-large")
 
         # Define metadata schema
@@ -141,15 +152,23 @@ class IndexerService:
             metadata: ChunkMetadata
 
         # Create table (overwrite mode handles concurrent access)
+        logger.info(f"Creating LanceDB table '{TABLE_NAME}'...")
         table = db.create_table(TABLE_NAME, schema=AnimalChunks, mode="overwrite")
 
         # Add chunks in batches to avoid rate limits
         batch_size = 50
+        total_batches = (len(processed_chunks) + batch_size - 1) // batch_size
+        logger.info(f"Adding {len(processed_chunks)} chunks in {total_batches} batches...")
+
         for i in range(0, len(processed_chunks), batch_size):
+            batch_num = i // batch_size + 1
             batch = processed_chunks[i:i + batch_size]
+            logger.info(f"Processing batch {batch_num}/{total_batches} ({len(batch)} chunks)...")
             table.add(batch)
 
-        return table.count_rows()
+        row_count = table.count_rows()
+        logger.info(f"LanceDB table now has {row_count} rows")
+        return row_count
 
     def update_source_chunk_counts(
         self,
