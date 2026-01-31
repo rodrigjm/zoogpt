@@ -195,18 +195,33 @@ class IndexerService:
 
         self.conn.commit()
 
-    def rebuild_index(self) -> tuple[int, int]:
+    def rebuild_index(self, fetch_missing: bool = True) -> tuple[int, int]:
         """
         Complete index rebuild process.
+
+        Args:
+            fetch_missing: If True, fetch content for animals without sources first
 
         Returns:
             Tuple of (total_documents, total_chunks)
         """
+        # 0. Optionally fetch/sync all content first
+        if fetch_missing:
+            from services.content_fetcher import ContentFetcher
+            fetcher = ContentFetcher(self.conn)
+            stats = fetcher.fetch_all_content()
+            logger.info(
+                f"Content sync complete: "
+                f"park={stats['park_synced']} species/{stats['park_sources']} new sources, "
+                f"external={stats['external_added']} added/{stats['external_failed']} failed"
+            )
+
         # 1. Read all sources
         sources = self.get_all_sources()
         total_documents = len(sources)
 
         if total_documents == 0:
+            logger.warning("No sources found to index")
             return (0, 0)
 
         # 2. Chunk all content
