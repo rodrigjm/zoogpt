@@ -112,7 +112,7 @@ describe('useVoiceRecorder', () => {
         await result.current.startRecording();
       });
 
-      expect(result.current.error).toBe('Permission denied');
+      expect(result.current.error).toBe('Microphone access denied. Please allow microphone in browser settings and refresh.');
       expect(result.current.isRecording).toBe(false);
       expect(result.current.isPreparing).toBe(false);
     });

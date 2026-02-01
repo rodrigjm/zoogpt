@@ -48,6 +48,7 @@ interface ChatState {
   sendMessage: (sessionId: string, content: string) => Promise<void>;
   sendMessageStream: (sessionId: string, content: string) => Promise<void>;
   addMessage: (message: ChatMessage) => void;
+  addImageMessage: (sessionId: string, imageUrls: string[], animalName: string) => void;
   clearMessages: () => void;
   setError: (error: string | null) => void;
   setRating: (messageId: string, rating: 'up' | 'down') => void;
@@ -98,6 +99,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         role: 'assistant',
         content: stripFollowupQuestions(response.reply),
         created_at: response.created_at,
+        sources: response.sources,  // Attach sources for image display
       };
 
       set((state) => ({
@@ -158,6 +160,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             role: 'assistant',
             content: stripFollowupQuestions(streamedText),
             created_at: new Date().toISOString(),
+            sources: data.sources || [],  // Attach sources for image display
           };
 
           set((state) => ({
@@ -191,6 +194,22 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   addMessage: (message: ChatMessage) => {
     set((state) => ({
       messages: [...state.messages, message],
+    }));
+  },
+
+  // Add an image-only message (for "Want to see a picture?" feature)
+  addImageMessage: (sessionId: string, imageUrls: string[], animalName: string) => {
+    const imageMessage: ChatMessage = {
+      message_id: `image-${Date.now()}`,
+      session_id: sessionId,
+      role: 'assistant',
+      content: `Here's a picture of ${animalName}!`,
+      created_at: new Date().toISOString(),
+      metadata: { isImageOnly: true, imageUrls },
+    };
+
+    set((state) => ({
+      messages: [...state.messages, imageMessage],
     }));
   },
 

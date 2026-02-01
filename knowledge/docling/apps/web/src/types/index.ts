@@ -47,6 +47,7 @@ export interface ChatMessage {
   content: string;
   created_at: string; // ISO-8601
   metadata?: Record<string, unknown>;
+  sources?: Source[];  // Per-message sources for image display
 }
 
 // ===== Chat Types =====

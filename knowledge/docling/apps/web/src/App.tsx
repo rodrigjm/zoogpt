@@ -1,18 +1,15 @@
 /**
  * Zoocari App - Main Application
- * Integrates Layout, ChatInterface, and ErrorBoundary
+ * Mobile-first chat interface with Leesburg Animal Park branding
  */
 
 import ErrorBoundary from './components/ErrorBoundary';
-import Layout from './components/Layout';
-import ChatInterface from './components/ChatInterface';
+import NewChatInterface from './components/ChatInterface/NewChatInterface';
 
 function App() {
   return (
     <ErrorBoundary>
-      <Layout>
-        <ChatInterface />
-      </Layout>
+      <NewChatInterface />
       {/* Park sign in top right corner - hidden on mobile, visible on tablet+ */}
       <img
         src="/park-sign.jpg"

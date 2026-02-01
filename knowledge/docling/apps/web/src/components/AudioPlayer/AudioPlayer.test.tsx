@@ -7,6 +7,7 @@ const mockPlay = vi.fn();
 const mockPause = vi.fn();
 const mockStop = vi.fn();
 const mockSeek = vi.fn();
+const mockReset = vi.fn();
 
 vi.mock('../../hooks', () => ({
   useAudioPlayer: () => ({
@@ -19,6 +20,7 @@ vi.mock('../../hooks', () => ({
     pause: mockPause,
     stop: mockStop,
     seek: mockSeek,
+    reset: mockReset,
   }),
 }));
 

@@ -1,5 +1,6 @@
 /**
  * Voice Store - Zustand store for voice/audio management
+ * Uses a state machine pattern with a single `mode` field
  * Handles STT, TTS, recording, and playback state
  */
 
@@ -7,14 +8,14 @@ import { create } from 'zustand';
 import { speechToText, textToSpeech, streamTextToSpeech } from '../lib/api';
 import type { TtsStreamAudioChunk } from '../types';
 
-type VoiceMode = 'idle' | 'recording' | 'processing' | 'playing';
+// Voice mode state machine - single source of truth
+export type VoiceMode = 'idle' | 'recording' | 'processing' | 'playing';
 
 interface VoiceState {
-  // State
+  // State machine - single source of truth
   mode: VoiceMode;
-  isRecording: boolean;
-  isProcessing: boolean;
-  isPlaying: boolean;
+
+  // Data
   transcribedText: string;
   audioUrl: string | null;
   error: string | null;
@@ -42,12 +43,16 @@ interface VoiceState {
   reset: () => void;
 }
 
+// Selectors for derived state (use these in components)
+export const selectIsRecording = (state: VoiceState) => state.mode === 'recording';
+export const selectIsProcessing = (state: VoiceState) => state.mode === 'processing';
+export const selectIsPlaying = (state: VoiceState) => state.mode === 'playing';
+export const selectIsIdle = (state: VoiceState) => state.mode === 'idle';
+export const selectIsBusy = (state: VoiceState) => state.mode !== 'idle';
+
 export const useVoiceStore = create<VoiceState>()((set, get) => ({
   // Initial state
   mode: 'idle',
-  isRecording: false,
-  isProcessing: false,
-  isPlaying: false,
   transcribedText: '',
   audioUrl: null,
   error: null,
@@ -82,7 +87,6 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       set({
         mediaRecorder: recorder,
         audioChunks: chunks,
-        isRecording: true,
         mode: 'recording',
         error: null,
       });
@@ -111,7 +115,6 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
         set({
           mediaRecorder: null,
           audioChunks: [],
-          isRecording: false,
           mode: 'idle',
         });
 
@@ -124,7 +127,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
 
   // Transcribe audio to text (STT)
   transcribe: async (sessionId: string, audioBlob: Blob) => {
-    set({ isProcessing: true, mode: 'processing', error: null });
+    set({ mode: 'processing', error: null });
 
     try {
       // Convert blob to File for FormData
@@ -137,14 +140,13 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
 
       set({
         transcribedText: response.text,
-        isProcessing: false,
         mode: 'idle',
       });
 
       return response.text;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Transcription failed';
-      set({ error: errorMsg, isProcessing: false, mode: 'idle' });
+      set({ error: errorMsg, mode: 'idle' });
       throw err;
     }
   },
@@ -158,7 +160,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       URL.revokeObjectURL(previousUrl);
     }
 
-    set({ isProcessing: true, mode: 'processing', error: null });
+    set({ mode: 'processing', error: null });
 
     try {
       const audioBlob = await textToSpeech({
@@ -172,19 +174,16 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
 
       set({
         audioUrl: url,
-        isProcessing: false,
-        isPlaying: true,
         mode: 'playing',
       });
 
       audio.onended = () => {
-        set({ isPlaying: false, mode: 'idle' });
+        set({ mode: 'idle' });
       };
 
       audio.onerror = () => {
         set({
           error: 'Audio playback failed',
-          isPlaying: false,
           mode: 'idle',
         });
       };
@@ -192,7 +191,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       await audio.play();
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Text-to-speech failed';
-      set({ error: errorMsg, isProcessing: false, mode: 'idle' });
+      set({ error: errorMsg, mode: 'idle' });
       throw err;
     }
   },
@@ -208,7 +207,6 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     }
 
     set({
-      isProcessing: true,
       mode: 'processing',
       error: null,
       streamingSentences: [],
@@ -219,6 +217,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     const audioQueue: Blob[] = [];
     let isPlayingQueue = false;
     let stopRequested = false;
+    let processingComplete = false;
 
     // Helper to convert base64 to Blob
     const base64ToBlob = (base64: string, mimeType: string = 'audio/wav'): Blob => {
@@ -235,8 +234,8 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       if (stopRequested || audioQueue.length === 0) {
         isPlayingQueue = false;
         // Check if we're done
-        if (audioQueue.length === 0 && !get().isProcessing) {
-          set({ isPlaying: false, mode: 'idle' });
+        if (audioQueue.length === 0 && processingComplete) {
+          set({ mode: 'idle' });
         }
         return;
       }
@@ -246,7 +245,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
       const url = URL.createObjectURL(audioBlob);
       const audio = new Audio(url);
 
-      set({ audioUrl: url, isPlaying: true, mode: 'playing' });
+      set({ audioUrl: url, mode: 'playing' });
 
       audio.onended = () => {
         URL.revokeObjectURL(url);
@@ -293,28 +292,28 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
 
           // Start playing if not already
           if (!isPlayingQueue) {
-            set({ isProcessing: false }); // First chunk received, no longer "processing"
             playNextInQueue();
           }
         },
         // onComplete
         () => {
-          set({ isProcessing: false });
+          processingComplete = true;
           // Queue will continue playing remaining chunks
+          if (!isPlayingQueue && audioQueue.length === 0) {
+            set({ mode: 'idle' });
+          }
         },
         // onError
         (error) => {
           set({
             error: error.message,
-            isProcessing: false,
-            isPlaying: false,
             mode: 'idle',
           });
         }
       );
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Streaming TTS failed';
-      set({ error: errorMsg, isProcessing: false, mode: 'idle' });
+      set({ error: errorMsg, mode: 'idle' });
       throw err;
     }
   },
@@ -323,7 +322,7 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
   stopPlayback: () => {
     // Note: We'd need to store the Audio element to stop it
     // For now, this just resets the state
-    set({ isPlaying: false, mode: 'idle' });
+    set({ mode: 'idle' });
   },
 
   // Set voice preference
@@ -355,9 +354,6 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
 
     set({
       mode: 'idle',
-      isRecording: false,
-      isProcessing: false,
-      isPlaying: false,
       transcribedText: '',
       audioUrl: null,
       error: null,
@@ -368,3 +364,10 @@ export const useVoiceStore = create<VoiceState>()((set, get) => ({
     });
   },
 }));
+
+// Backwards-compatible hooks for existing components
+// These derive boolean state from the mode state machine
+export const useIsRecording = () => useVoiceStore(selectIsRecording);
+export const useIsProcessing = () => useVoiceStore(selectIsProcessing);
+export const useIsPlaying = () => useVoiceStore(selectIsPlaying);
+export const useIsVoiceBusy = () => useVoiceStore(selectIsBusy);

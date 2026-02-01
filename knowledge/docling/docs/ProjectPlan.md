@@ -1,6 +1,6 @@
 # Zoocari Project Plan
 
-> **Last Updated:** 2026-01-25 (KB Park Animals Expansion Complete)
+> **Last Updated:** 2026-01-31 (Chat Redesign Complete & Deployed)
 > **Status:** Active Development
 > **Branch:** feature/node-fastapi-migration
 
@@ -27,6 +27,7 @@
 ---
 
 ## Active Features (In Progress)
+
 
 ### 🔄 Multi-Lingual Support (English/Spanish)
 - **Directory:** `docs/active/multilingual-support/`
@@ -106,6 +107,7 @@
 
 | Feature | Completed | Documentation |
 |---------|-----------|---------------|
+| Mobile-First Chat UI Redesign | 2026-01-31 | `docs/archive/chat-redesign/` |
 | KB Park Animals Expansion | 2026-01-25 | `docs/active/kb-park-animals/` |
 | Park Inventory Integration | 2026-01-25 | `docs/active/park-inventory-integration/` |
 | User Feedback System | 2026-01-25 | `docs/active/feedback-system/` |
@@ -126,6 +128,7 @@
 - [x] add personalized information for each animal → **Complete:** `docs/active/park-inventory-integration/`
 - [x] Thumbs up/down on answers provided → **Complete:** `docs/active/feedback-system/`
 - [x] Multi-language support → **Active:** `docs/active/multilingual-support/`
+- [x] Mobile-first chat UI redesign → **Complete:** `docs/archive/chat-redesign/`
 - [ ] admin app - Analytics dashboard - ability to review per model performance & ability to change ollama models (with ollama endpoint instantiaion and retireing old model)
 - [x] feedback text/record button for additional feedback on experience → **Complete:** `docs/active/feedback-system/`
 - [ ] local ollama hosted embedding model

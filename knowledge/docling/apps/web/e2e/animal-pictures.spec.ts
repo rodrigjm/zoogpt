@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /**
  * E2E Test: Animal Pictures Feature
- * Tests collapsible image gallery that appears after chat response with animal mentions
+ * Tests "Want to see a picture?" button that appears after chat response with animal sources
  */
 test.describe('Animal Pictures Feature', () => {
   test.beforeEach(async ({ page }) => {
@@ -18,13 +18,12 @@ test.describe('Animal Pictures Feature', () => {
       });
     });
 
-    // Mock chat stream with animal sources
+    // Mock chat stream with animal sources containing images
     await page.route('**/api/chat/stream', async (route) => {
       const streamResponse = [
-        'data: {"type":"content","content":"Lions are fascinating animals! "}\n\n',
-        'data: {"type":"content","content":"They live in prides and are known as the king of the jungle."}\n\n',
-        'data: {"type":"sources","sources":[{"animal":"Lion","thumbnail":"https://picsum.photos/seed/lion1/400/300","image_urls":["https://picsum.photos/seed/lion2/800/600","https://picsum.photos/seed/lion3/800/600"],"alt":"Lion in the wild"}]}\n\n',
-        'data: {"type":"done"}\n\n',
+        'data: {"type":"text","content":"Lions are fascinating animals! "}\n\n',
+        'data: {"type":"text","content":"They live in prides and are known as the king of the jungle."}\n\n',
+        'data: {"type":"done","sources":[{"animal":"Lion","title":"Lion Facts","thumbnail":"https://picsum.photos/seed/lion1/400/300","image_urls":["https://picsum.photos/seed/lion2/800/600","https://picsum.photos/seed/lion3/800/600"],"alt":"Lion in the wild"}],"followup_questions":[]}\n\n',
       ].join('');
 
       await route.fulfill({
@@ -38,105 +37,46 @@ test.describe('Animal Pictures Feature', () => {
     await page.waitForTimeout(500);
   });
 
-  test('should display collapsible gallery button after response', async ({ page }) => {
-    // Click Lion button to start chat
-    const lionButton = page.getByRole('button', { name: 'Lion' });
+  test('should display "Want to see a picture?" button after response with images', async ({ page }) => {
+    // Click Lion button to start chat (use specific aria-label to avoid matching followup chips)
+    const lionButton = page.getByRole('button', { name: 'Learn about Lion' });
     await lionButton.click();
 
-    // Wait a bit for stream to complete
-    await page.waitForTimeout(3000);
-
-    // Check for any assistant message text
-    const assistantMessage = page.locator('text=/Lions/i');
-    await expect(assistantMessage.first()).toBeVisible({ timeout: 5000 });
-
-    // Check for collapsible gallery button with "photos"
-    const galleryButton = page.getByRole('button', { name: /photos/i });
-    await expect(galleryButton).toBeVisible({ timeout: 5000 });
-  });
-
-  test('should expand and collapse gallery on button click', async ({ page }) => {
-    // Click Lion button to start chat
-    const lionButton = page.getByRole('button', { name: 'Lion' });
-    await lionButton.click();
-
-    // Wait for response to complete
+    // Wait for assistant response
     await expect(page.getByText(/Lions are fascinating/i)).toBeVisible({ timeout: 10000 });
 
-    // Wait for gallery button
-    const galleryButton = page.getByRole('button', { name: /See.*Lion.*photos/i });
-    await expect(galleryButton).toBeVisible({ timeout: 5000 });
-
-    // Click to expand gallery
-    await galleryButton.click();
-
-    // Verify button text changes to "Hide photos"
-    await expect(page.getByRole('button', { name: /Hide photos/i })).toBeVisible({ timeout: 3000 });
-
-    // Verify images are shown in grid
-    const gallery = page.locator('#animal-gallery');
-    await expect(gallery).toBeVisible();
-
-    // Click to collapse
-    const hideButton = page.getByRole('button', { name: /Hide photos/i });
-    await hideButton.click();
-
-    // Verify gallery is hidden
-    await expect(gallery).not.toBeVisible();
+    // Check for "Want to see a picture?" button
+    const pictureButton = page.getByRole('button', { name: /Want to see a picture/i });
+    await expect(pictureButton).toBeVisible({ timeout: 5000 });
   });
 
-  test('should display correct number of images', async ({ page }) => {
+  test('should show image message when "Want to see a picture?" is clicked', async ({ page }) => {
     // Click Lion button to start chat
-    const lionButton = page.getByRole('button', { name: 'Lion' });
+    const lionButton = page.getByRole('button', { name: 'Learn about Lion' });
     await lionButton.click();
 
-    // Wait for response to complete
+    // Wait for response
     await expect(page.getByText(/Lions are fascinating/i)).toBeVisible({ timeout: 10000 });
 
-    // Wait and expand gallery
-    const galleryButton = page.getByRole('button', { name: /See.*photos/i });
-    await expect(galleryButton).toBeVisible({ timeout: 5000 });
+    // Click the picture button
+    const pictureButton = page.getByRole('button', { name: /Want to see a picture/i });
+    await expect(pictureButton).toBeVisible({ timeout: 5000 });
+    await pictureButton.click();
 
-    // Check button shows count in parentheses
-    const buttonText = await galleryButton.textContent();
-    expect(buttonText).toMatch(/\(\d+\)/);
+    // Verify new image message appears
+    await expect(page.getByText(/Here's a picture of/i)).toBeVisible({ timeout: 5000 });
 
-    await galleryButton.click();
-
-    // Count images in grid
-    const images = page.locator('#animal-gallery img');
-    const count = await images.count();
-    expect(count).toBeGreaterThan(0);
+    // Verify images are displayed
+    const images = page.locator('img[alt*="Animal picture"]');
+    await expect(images.first()).toBeVisible({ timeout: 5000 });
   });
 
-  test('should open lightbox when image is clicked', async ({ page }) => {
-    // Click Lion button to start chat
-    const lionButton = page.getByRole('button', { name: 'Lion' });
-    await lionButton.click();
-
-    // Wait for response to complete
-    await expect(page.getByText(/Lions are fascinating/i)).toBeVisible({ timeout: 10000 });
-
-    // Expand gallery
-    const galleryButton = page.getByRole('button', { name: /See.*photos/i });
-    await expect(galleryButton).toBeVisible({ timeout: 5000 });
-    await galleryButton.click();
-
-    // Click first image
-    const firstImage = page.locator('#animal-gallery img').first();
-    await firstImage.click();
-
-    // Verify lightbox appears - check for fixed overlay
-    const lightbox = page.locator('.fixed.inset-0');
-    await expect(lightbox.first()).toBeVisible({ timeout: 3000 });
-  });
-
-  test('should not show gallery before streaming completes', async ({ page }) => {
-    // Override mock with incomplete stream
+  test('should not show picture button when no images in sources', async ({ page }) => {
+    // Override mock with no image_urls
     await page.route('**/api/chat/stream', async (route) => {
       const streamResponse = [
-        'data: {"type":"content","content":"Lions are fascinating... "}\n\n',
-        // Note: no "done" event yet
+        'data: {"type":"text","content":"Lions are fascinating animals!"}\n\n',
+        'data: {"type":"done","sources":[{"animal":"Lion","title":"Lion Facts"}],"followup_questions":[]}\n\n',
       ].join('');
 
       await route.fulfill({
@@ -146,40 +86,82 @@ test.describe('Animal Pictures Feature', () => {
       });
     });
 
-    // Click Lion button to start chat
-    const lionButton = page.getByRole('button', { name: 'Lion' });
+    // Click Lion button
+    const lionButton = page.getByRole('button', { name: 'Learn about Lion' });
     await lionButton.click();
 
-    // Wait a moment
-    await page.waitForTimeout(2000);
+    // Wait for response
+    await expect(page.getByText(/Lions are fascinating/i)).toBeVisible({ timeout: 10000 });
 
-    // Gallery button should not appear yet
-    const galleryButton = page.getByRole('button', { name: /See.*photos/i });
-    await expect(galleryButton).not.toBeVisible();
+    // Picture button should NOT appear (no images in sources)
+    const pictureButton = page.getByRole('button', { name: /Want to see a picture/i });
+    await expect(pictureButton).not.toBeVisible({ timeout: 2000 });
+  });
+
+  test('should not show picture button on image-only messages', async ({ page }) => {
+    // Click Lion button
+    const lionButton = page.getByRole('button', { name: 'Learn about Lion' });
+    await lionButton.click();
+
+    // Wait for response and click picture button
+    await expect(page.getByText(/Lions are fascinating/i)).toBeVisible({ timeout: 10000 });
+    const pictureButton = page.getByRole('button', { name: /Want to see a picture/i });
+    await expect(pictureButton).toBeVisible({ timeout: 5000 });
+    await pictureButton.click();
+
+    // Wait for image message
+    await expect(page.getByText(/Here's a picture of/i)).toBeVisible({ timeout: 5000 });
+
+    // The image-only message should NOT have another picture button (prevents infinite loop)
+    const allPictureButtons = page.getByRole('button', { name: /Want to see a picture/i });
+    const count = await allPictureButtons.count();
+    // Should still only have 1 button (on original message), not on image message
+    expect(count).toBe(1);
+  });
+
+  test('should display multiple images when sources have multiple image_urls', async ({ page }) => {
+    // Click Lion button
+    const lionButton = page.getByRole('button', { name: 'Learn about Lion' });
+    await lionButton.click();
+
+    // Wait for response
+    await expect(page.getByText(/Lions are fascinating/i)).toBeVisible({ timeout: 10000 });
+
+    // Click picture button
+    const pictureButton = page.getByRole('button', { name: /Want to see a picture/i });
+    await pictureButton.click();
+
+    // Wait for image message
+    await expect(page.getByText(/Here's a picture of/i)).toBeVisible({ timeout: 5000 });
+
+    // Count images - mock has 2 image_urls
+    const images = page.locator('img[alt*="Animal picture"]');
+    const count = await images.count();
+    expect(count).toBe(2);
   });
 
   test('should handle mobile viewport correctly', async ({ page }) => {
     // Set mobile viewport
     await page.setViewportSize({ width: 375, height: 667 });
 
-    // Click Lion button to start chat
-    const lionButton = page.getByRole('button', { name: 'Lion' });
+    // Click Lion button
+    const lionButton = page.getByRole('button', { name: 'Learn about Lion' });
     await lionButton.click();
 
-    // Wait for response to complete
+    // Wait for response
     await expect(page.getByText(/Lions are fascinating/i)).toBeVisible({ timeout: 10000 });
 
-    // Expand gallery
-    const galleryButton = page.getByRole('button', { name: /See.*photos/i });
-    await expect(galleryButton).toBeVisible({ timeout: 5000 });
-    await galleryButton.click();
+    // Picture button should be visible and have proper touch target
+    const pictureButton = page.getByRole('button', { name: /Want to see a picture/i });
+    await expect(pictureButton).toBeVisible({ timeout: 5000 });
 
-    // Verify gallery grid is visible and responsive
-    const gallery = page.locator('#animal-gallery');
-    await expect(gallery).toBeVisible();
+    // Click and verify image appears
+    await pictureButton.click();
+    await expect(page.getByText(/Here's a picture of/i)).toBeVisible({ timeout: 5000 });
 
-    // Check that images fit within viewport
-    const firstImage = page.locator('#animal-gallery img').first();
+    // Verify images fit within viewport
+    const firstImage = page.locator('img[alt*="Animal picture"]').first();
+    await expect(firstImage).toBeVisible();
     const boundingBox = await firstImage.boundingBox();
     expect(boundingBox?.width).toBeLessThanOrEqual(375);
   });
