@@ -134,7 +134,7 @@ export const AssistantBubble = React.memo<AssistantBubbleProps>(({
             </details>
           )}
 
-          {/* Want to see a picture? button */}
+          {/* Gallery disabled — images incorrect for ~60/70 animals. See backlog in ProjectPlan.md
           {hasAvailableImages && onRequestImage && (
             <button
               onClick={onRequestImage}
@@ -144,6 +144,7 @@ export const AssistantBubble = React.memo<AssistantBubbleProps>(({
               <span>Want to see a picture?</span>
             </button>
           )}
+          */}
         </div>
 
         {/* Rating Buttons */}
