@@ -1,8 +1,10 @@
 # Zoocari Project Plan
 
-> **Last Updated:** 2026-01-31 (Chat Redesign Complete & Deployed)
+> **Last Updated:** 2026-02-22 (Animal Image Gallery disabled in UI)
 > **Status:** Active Development
 > **Branch:** feature/node-fastapi-migration
+>
+> **Latest Change:** Disabled animal image gallery from chat UI — images were incorrect for ~60/70 animals. All gallery components (`AnimalImageGallery`, `AnimalImage`, `ImageLightbox`, `ImageSkeleton`), data (`animal_images.json`), and backend RAG enrichment remain intact. Gallery rendering commented out in `MessageBubble.tsx`. Fix image sourcing added to backlog.
 
 ---
 
@@ -44,12 +46,13 @@
 | QA Validation | ⬜ | |
 | Deployment | ⬜ | |
 
-### ✅ Animal Pictures in Chat
+### ⏸️ Animal Pictures in Chat (Disabled)
 - **Directory:** `docs/active/animal-pictures/`
-- **Status:** Complete
+- **Status:** Disabled in UI — moved to backlog
 - **Owner:** Frontend Agent
 - **Started:** 2026-01-20
 - **Completed:** 2026-01-24
+- **Disabled:** 2026-02-22 — Images incorrect for ~60/70 animals
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -57,6 +60,7 @@
 | Image Source Decision | ✅ Done | JSON config file |
 | Implementation | ✅ Done | 4 components, 8 animals configured |
 | QA & Polish | ✅ Done | Images show by default |
+| **Gallery hidden in UI** | ⏸️ | Gallery components preserved, rendering commented out in MessageBubble.tsx |
 
 ### ✅ Admin Portal Image Management
 - **Directory:** `docs/active/image-management/`
@@ -138,6 +142,7 @@
 - [ ] Offline mode support
 
 ### Backlog
+- [ ] **Animal Image Gallery — Fix Image Sourcing** - Gallery components preserved in codebase (`AnimalImageGallery`, `AnimalImage`, `ImageLightbox`, `ImageSkeleton`), disabled in UI pending correct image sourcing for ~60/70 animals. Re-enable by uncommenting gallery block in `MessageBubble.tsx`.
 - [ ] **AI Feedback Synthesis & ClickUp Integration** - Use LLM/OpenAI to analyze customer feedback table, synthesize into actionable feature proposals with: reason, market fit, customer experience impact. Auto-post to ClickUp via MCP capabilities for product backlog management.
 - [ ] Voice personality customization
 - [ ] Parent dashboard

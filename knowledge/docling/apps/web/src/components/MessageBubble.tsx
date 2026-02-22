@@ -77,6 +77,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isStreaming
         {isStreaming && !isUser && (
           <StreamingIndicator />
         )}
+        {/* Gallery disabled — images incorrect for ~60/70 animals. See backlog in ProjectPlan.md
         {!isStreaming && !isUser && animalsWithImages.length > 0 && (
           <div className="mt-4">
             {animalsWithImages.map((source) => (
@@ -90,6 +91,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = memo(({ message, isStreaming
             ))}
           </div>
         )}
+        */}
         {sources && sources.length > 0 && !isUser && (
           <div className="mt-3 pt-3 border-t border-leesburg-brown/20">
             <p className="text-sm text-leesburg-brown/70 break-all">
