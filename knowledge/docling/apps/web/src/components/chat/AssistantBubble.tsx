@@ -10,6 +10,7 @@ interface AssistantBubbleProps {
   onRate?: (rating: 'up' | 'down') => void;
   currentRating?: 'up' | 'down' | null;
   onRequestImage?: () => void;
+  onFeedback?: () => void;
   isImageOnly?: boolean;
   imageUrls?: string[];
 }
@@ -23,6 +24,7 @@ export const AssistantBubble = React.memo<AssistantBubbleProps>(({
   onRate,
   currentRating,
   onRequestImage,
+  onFeedback,
   isImageOnly = false,
   imageUrls = [],
 }) => {
@@ -108,14 +110,16 @@ export const AssistantBubble = React.memo<AssistantBubbleProps>(({
           )}
 
           {/* Sources (collapsible) */}
-          {sources.length > 0 && (
+          {sources.length > 0 && (() => {
+            const uniqueSources = sources.filter((s, i, arr) => arr.findIndex(x => x.animal === s.animal && x.title === s.title) === i);
+            return (
             <details className="mt-3 text-text-secondary">
               <summary className="cursor-pointer text-sm font-medium hover:text-text-primary transition-colors">
-                Sources ({sources.length})
+                Sources ({uniqueSources.length})
               </summary>
               <ul className="mt-2 space-y-2 text-sm">
-                {sources.map((source, idx) => (
-                  <li key={idx} className="pl-3 border-l-2 border-accent-primary/30">
+                {uniqueSources.map((source) => (
+                  <li key={`${source.animal}-${source.title}`} className="pl-3 border-l-2 border-accent-primary/30">
                     <div className="font-medium">{source.animal}</div>
                     <div className="text-text-muted">{source.title}</div>
                     {source.url && (
@@ -132,7 +136,8 @@ export const AssistantBubble = React.memo<AssistantBubbleProps>(({
                 ))}
               </ul>
             </details>
-          )}
+            );
+          })()}
 
           {/* Gallery disabled — images incorrect for ~60/70 animals. See backlog in ProjectPlan.md
           {hasAvailableImages && onRequestImage && (
@@ -174,6 +179,15 @@ export const AssistantBubble = React.memo<AssistantBubbleProps>(({
             >
               👎
             </button>
+            {onFeedback && (
+              <button
+                onClick={onFeedback}
+                className="text-xs text-text-muted hover:text-text-secondary transition-colors ml-1"
+                type="button"
+              >
+                Share your thoughts
+              </button>
+            )}
           </div>
         )}
       </div>

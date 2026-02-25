@@ -24,9 +24,6 @@ const animals: Animal[] = [
 const AnimalGrid: React.FC<AnimalGridProps> = memo(({ onSelectAnimal, disabled = false }) => {
   return (
     <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 py-4 sm:py-6">
-      <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-leesburg-brown mb-3 sm:mb-4 text-center">
-        Pick an animal to learn about!
-      </h2>
       <div
         role="group"
         aria-label="Animal selection buttons"

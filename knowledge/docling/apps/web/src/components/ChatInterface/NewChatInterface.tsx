@@ -186,18 +186,6 @@ export default function NewChatInterface() {
               </div>
             )}
 
-            {/* Feedback link */}
-            {hasMessages && (
-              <div className="px-4 py-1 text-center">
-                <button
-                  onClick={() => setShowFeedbackModal(true)}
-                  className="text-xs text-text-muted hover:text-text-secondary transition-colors"
-                >
-                  Share your thoughts
-                </button>
-              </div>
-            )}
-
             {/* Input bar */}
             <InputBar
               onSend={handleTextSend}
@@ -236,6 +224,7 @@ export default function NewChatInterface() {
               onRate={handleRate}
               getRating={getRating}
               onRequestImage={handleRequestImage}
+              onFeedback={() => setShowFeedbackModal(true)}
             />
           )}
 

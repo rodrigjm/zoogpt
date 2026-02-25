@@ -13,6 +13,7 @@ interface MessageListProps {
   onRate?: (messageId: string, rating: 'up' | 'down') => void;
   getRating?: (messageId: string) => 'up' | 'down' | null;
   onRequestImage?: (messageId: string) => void;
+  onFeedback?: () => void;
 }
 
 export const MessageList = React.memo<MessageListProps>(({
@@ -23,6 +24,7 @@ export const MessageList = React.memo<MessageListProps>(({
   onRate,
   getRating,
   onRequestImage,
+  onFeedback,
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -72,6 +74,7 @@ export const MessageList = React.memo<MessageListProps>(({
                   onRequestImage={onRequestImage ? () => onRequestImage(msg.message_id) : undefined}
                   isImageOnly={msg.metadata?.isImageOnly === true}
                   imageUrls={(msg.metadata?.imageUrls as string[]) || []}
+                  onFeedback={onFeedback}
                 />
               )}
             </React.Fragment>
