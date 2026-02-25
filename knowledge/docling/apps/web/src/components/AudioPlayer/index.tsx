@@ -22,30 +22,35 @@ export default function AudioPlayer({
   const { isPlaying, isLoading, currentTime, duration, error, play, pause, seek, reset } =
     useAudioPlayer();
 
-  const hasLoadedRef = useRef(false);
   const audioBlobRef = useRef<Blob | null>(null);
+  const wasPlayingRef = useRef(false);
 
   // Load audio when audioBlob changes
   useEffect(() => {
     if (audioBlob && audioBlob !== audioBlobRef.current) {
-      // Reset previous audio state before loading new blob
       reset();
       audioBlobRef.current = audioBlob;
-      hasLoadedRef.current = false;
+      wasPlayingRef.current = false;
 
       if (autoPlay) {
         play(audioBlob);
-        hasLoadedRef.current = true;
       }
     }
   }, [audioBlob, autoPlay, play, reset]);
 
-  // Call onEnded callback when playback ends
+  // Call onEnded callback when playback transitions from playing to stopped
   useEffect(() => {
-    if (!isPlaying && hasLoadedRef.current && currentTime === 0 && duration > 0) {
-      onEnded?.();
+    if (isPlaying) {
+      wasPlayingRef.current = true;
+    } else if (wasPlayingRef.current) {
+      // Transitioned from playing to not-playing = ended or paused
+      wasPlayingRef.current = false;
+      if (currentTime === 0) {
+        // currentTime resets to 0 on ended, stays > 0 on pause
+        onEnded?.();
+      }
     }
-  }, [isPlaying, currentTime, duration, onEnded]);
+  }, [isPlaying, currentTime, onEnded]);
 
   const handlePlayPause = () => {
     if (isPlaying) {
@@ -53,7 +58,6 @@ export default function AudioPlayer({
     } else {
       // Always play with current blob - hook handles cleanup
       play(audioBlob);
-      hasLoadedRef.current = true;
     }
   };
 

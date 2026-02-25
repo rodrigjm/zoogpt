@@ -73,13 +73,14 @@ export default function KnowledgeBase() {
   async function fetchData() {
     try {
       const [animalsData, statusData] = await Promise.all([
-        kbApi.getAnimals({ limit: 100 }),
+        kbApi.getAnimals({ limit: 200 }),
         kbApi.getIndexStatus(),
       ])
       setAnimals(animalsData.animals)
       setIndexStatus(statusData)
       setError(null)
     } catch (err) {
+      console.error('[KnowledgeBase] Failed to load:', err)
       setError(err instanceof Error ? err.message : 'Failed to load knowledge base')
     } finally {
       setIsLoading(false)

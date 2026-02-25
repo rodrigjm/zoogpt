@@ -1,10 +1,10 @@
 # Zoocari Project Plan
 
-> **Last Updated:** 2026-02-22 (Animal Image Gallery disabled in UI)
+> **Last Updated:** 2026-02-24 (Bug fixes verified via Playwright, nginx cache fix, debug cleanup)
 > **Status:** Active Development
 > **Branch:** feature/node-fastapi-migration
 >
-> **Latest Change:** Disabled animal image gallery from chat UI — images were incorrect for ~60/70 animals. All gallery components (`AnimalImageGallery`, `AnimalImage`, `ImageLightbox`, `ImageSkeleton`), data (`animal_images.json`), and backend RAG enrichment remain intact. Gallery rendering commented out in `MessageBubble.tsx`. Fix image sourcing added to backlog.
+> **Latest Change:** All bug fixes verified via Playwright end-to-end testing. Bug 1 (input blocking during audio) confirmed working. Bug 3 (KB listing + health check) confirmed: 138 animals displayed, admin container healthy. Added nginx `Cache-Control: no-cache` for `index.html` to prevent stale JS bundles after rebuilds. Removed debug instrumentation code.
 
 ---
 
@@ -30,21 +30,7 @@
 
 ## Active Features (In Progress)
 
-
-### 🔄 Multi-Lingual Support (English/Spanish)
-- **Directory:** `docs/active/multilingual-support/`
-- **Status:** Phase 0 of 6 (Planning Complete)
-- **Owner:** TBD
-- **Started:** 2026-01-20
-
-| Task | Status | Notes |
-|------|--------|-------|
-| Design & Planning | ✅ | [design.md](./active/multilingual-support/design.md) |
-| Phase 1: API Contracts | ⬜ | Foundation for all phases |
-| Phase 2-4: Voice/RAG/Frontend | ⬜ | Parallel execution |
-| Phase 5-6: KB/Safety | ⬜ | Sequential |
-| QA Validation | ⬜ | |
-| Deployment | ⬜ | |
+_No active features in progress._
 
 ### ⏸️ Animal Pictures in Chat (Disabled)
 - **Directory:** `docs/active/animal-pictures/`
@@ -102,9 +88,9 @@
 
 | ID | Description | Severity | Status | Related Docs |
 |----|-------------|----------|--------|--------------|
-| 1 | block intrasession questions/text before audio has completed | - | - | - |
-| 2 | admin portal model or prompt panel not showing ollama parameters | - | - | - |
-| 3 | admin portal KB vector index not showing any animals | - | - | - |
+| 1 | Block intrasession questions/text before audio has completed | Medium | ✅ Verified | `isAudioPlaying` state + `wasPlayingRef` transition detection. Playwright-verified: textarea disabled during TTS, re-enabled on audio end |
+| 2 | Admin portal model/prompt panel not showing Ollama parameters | Low | ➡️ Backlog | Reclassified as feature enhancement — `ModelConfig` only has 3 fields, Ollama params (top_p, top_k, etc.) never implemented |
+| 3 | Admin portal KB vector index not showing any animals | High | ✅ Verified | Playwright-verified: 138 animals displayed, admin container healthy. Docker health check (IPv6→IPv4), KB limit 100→200 |
 ---
 
 ## Completed (Recent)
@@ -131,7 +117,7 @@
 - [x] Admin portal image management → **Complete:** `docs/active/image-management/`
 - [x] add personalized information for each animal → **Complete:** `docs/active/park-inventory-integration/`
 - [x] Thumbs up/down on answers provided → **Complete:** `docs/active/feedback-system/`
-- [x] Multi-language support → **Active:** `docs/active/multilingual-support/`
+- [ ] Multi-language support → **Moved to Backlog:** `docs/active/multilingual-support/`
 - [x] Mobile-first chat UI redesign → **Complete:** `docs/archive/chat-redesign/`
 - [ ] admin app - Analytics dashboard - ability to review per model performance & ability to change ollama models (with ollama endpoint instantiaion and retireing old model)
 - [x] feedback text/record button for additional feedback on experience → **Complete:** `docs/active/feedback-system/`
@@ -142,6 +128,8 @@
 - [ ] Offline mode support
 
 ### Backlog
+- [ ] **Multi-Lingual Support (English/Spanish)** - Planning complete, design doc at `docs/active/multilingual-support/design.md`. 6-phase implementation: API contracts → Voice/RAG/Frontend (parallel) → KB/Safety → QA → Deploy. ~35-45 files affected.
+- [ ] **Admin Portal Ollama Parameters** - Add Ollama-specific model params (top_p, top_k, repeat_penalty, etc.) to admin config panel. Requires updates across ModelConfig (Python + TypeScript), admin UI, and LLM/RAG services. ~7 files.
 - [ ] **Animal Image Gallery — Fix Image Sourcing** - Gallery components preserved in codebase (`AnimalImageGallery`, `AnimalImage`, `ImageLightbox`, `ImageSkeleton`), disabled in UI pending correct image sourcing for ~60/70 animals. Re-enable by uncommenting gallery block in `MessageBubble.tsx`.
 - [ ] **AI Feedback Synthesis & ClickUp Integration** - Use LLM/OpenAI to analyze customer feedback table, synthesize into actionable feature proposals with: reason, market fit, customer experience impact. Auto-post to ClickUp via MCP capabilities for product backlog management.
 - [ ] Voice personality customization

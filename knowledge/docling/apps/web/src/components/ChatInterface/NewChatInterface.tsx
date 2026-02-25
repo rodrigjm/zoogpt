@@ -25,6 +25,7 @@ const AudioPlayer = lazy(() => import('../AudioPlayer'));
 
 export default function NewChatInterface() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
@@ -72,6 +73,7 @@ export default function NewChatInterface() {
       })
         .then((blob) => {
           setAudioBlob(blob);
+          setIsAudioPlaying(true);
         })
         .catch((err) => {
           console.error('TTS generation failed:', err);
@@ -155,7 +157,7 @@ export default function NewChatInterface() {
   }, [sessionId, feedbackText]);
 
   // Interaction disabled state
-  const isDisabled = sessionLoading || isStreaming || !sessionId;
+  const isDisabled = sessionLoading || isStreaming || !sessionId || isAudioPlaying;
   const showVoiceOverlay = voiceMode === 'recording' || voiceMode === 'processing';
   const hasMessages = messages.length > 0 || isStreaming;
 
@@ -179,7 +181,7 @@ export default function NewChatInterface() {
             {audioBlob && (
               <div className="px-4 py-2">
                 <Suspense fallback={<div className="text-center text-text-muted text-sm">Loading audio...</div>}>
-                  <AudioPlayer audioBlob={audioBlob} autoPlay={true} />
+                  <AudioPlayer audioBlob={audioBlob} autoPlay={true} onEnded={() => setIsAudioPlaying(false)} />
                 </Suspense>
               </div>
             )}
