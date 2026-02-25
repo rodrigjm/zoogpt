@@ -6,12 +6,16 @@ const WelcomeMessage = memo(() => {
       <div className="max-w-2xl w-full text-center space-y-4 sm:space-y-6">
         {/* Main Welcome */}
         <div className="space-y-2 sm:space-y-3">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-heading font-bold text-text-primary">
-            Welcome to Zoocari! 🦁
-          </h2>
-          <p className="text-lg sm:text-xl md:text-2xl text-text-secondary font-medium">
-            I'm your friendly zoo guide!
-          </p>
+          <div className="flex items-center justify-center gap-3 sm:gap-4">
+            <img
+              src="/park-sign.jpg"
+              alt="Leesburg Animal Park"
+              className="w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 lg:w-20 lg:h-20 object-contain rounded-lg"
+            />
+            <h2 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-heading font-bold text-text-primary">
+              Welcome to Zoocari @ Leesburg Animal Park
+            </h2>
+          </div>
         </div>
 
         {/* Description */}

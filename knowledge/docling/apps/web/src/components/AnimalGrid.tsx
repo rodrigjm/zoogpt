@@ -7,18 +7,18 @@ interface AnimalGridProps {
 
 interface Animal {
   name: string;
-  emoji: string;
+  thumb: string;
 }
 
 const animals: Animal[] = [
-  { name: 'Lion', emoji: '🦁' },
-  { name: 'Elephant', emoji: '🐘' },
-  { name: 'Giraffe', emoji: '🦒' },
-  { name: 'Camel', emoji: '🐫' },
-  { name: 'Emu', emoji: '🪿' },
-  { name: 'Serval', emoji: '🐆' },
-  { name: 'Porcupine', emoji: '🦔' },
-  { name: 'Lemur', emoji: '🐒' },
+  { name: 'Lion', thumb: '/images/animals/lion_1.webp' },
+  { name: 'Elephant', thumb: '/images/animals/elephant_1.webp' },
+  { name: 'Giraffe', thumb: '/images/animals/giraffe_1.webp' },
+  { name: 'Camel', thumb: '/images/animals/camel_1.webp' },
+  { name: 'Emu', thumb: '/images/animals/emu_1.webp' },
+  { name: 'Serval', thumb: '/images/animals/serval_1.webp' },
+  { name: 'Porcupine', thumb: '/images/animals/porcupine_1.webp' },
+  { name: 'Lemur', thumb: '/images/animals/lemur_1.webp' },
 ];
 
 const AnimalGrid: React.FC<AnimalGridProps> = memo(({ onSelectAnimal, disabled = false }) => {
@@ -43,9 +43,7 @@ const AnimalGrid: React.FC<AnimalGridProps> = memo(({ onSelectAnimal, disabled =
               shadow-md
               transition-all
               duration-200
-              p-3
-              sm:p-4
-              md:p-6
+              overflow-hidden
               flex
               flex-col
               items-center
@@ -64,10 +62,13 @@ const AnimalGrid: React.FC<AnimalGridProps> = memo(({ onSelectAnimal, disabled =
               }
             `}
           >
-            <span className="text-3xl sm:text-4xl md:text-5xl" role="img" aria-label={animal.name}>
-              {animal.emoji}
-            </span>
-            <span className="text-sm sm:text-base md:text-lg font-semibold">{animal.name}</span>
+            <img
+              src={animal.thumb}
+              alt={animal.name}
+              className="w-full aspect-square object-cover"
+              loading="lazy"
+            />
+            <span className="text-sm sm:text-base md:text-lg font-semibold pb-2 sm:pb-3">{animal.name}</span>
           </button>
         ))}
       </div>
