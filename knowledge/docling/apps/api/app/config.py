@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     # LLM Settings
     llm_provider: str = "ollama"
     ollama_url: str = "http://ollama:11434"
-    ollama_model: str = "phi4"
+    ollama_model: str = "qwen2.5:3b"
     ollama_guard_model: str = "llama-guard3:1b"
 
     # TTS Settings

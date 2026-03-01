@@ -24,6 +24,7 @@ from ..services.tts import TTSService
 from ..services.analytics import get_analytics_service
 from ..config import settings
 from ..utils.timing import RequestTimer
+from ..utils.async_helpers import run_sync, fire_and_forget
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ async def speech_to_text(
 
     # Validate session exists
     timer.mark("Validating session")
-    session = _session_service.get_session(session_id)
+    session = await run_sync(_session_service.get_session, session_id)
     if not session:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -195,7 +196,7 @@ async def text_to_speech(body: TTSRequest):
 
     # Validate session exists
     timer.mark("Validating session")
-    session = _session_service.get_session(body.session_id)
+    session = await run_sync(_session_service.get_session, body.session_id)
     if not session:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -225,7 +226,7 @@ async def text_to_speech(body: TTSRequest):
     try:
         timer.mark("Starting TTS synthesis")
         with timer.component("tts"):
-            audio_bytes = _tts_service.synthesize(text=body.text, voice=body.voice)
+            audio_bytes = await run_sync(_tts_service.synthesize, text=body.text, voice=body.voice)
         timer.mark(f"Synthesis complete: {len(audio_bytes)} bytes audio")
     except Exception as e:
         logger.error(f"TTS synthesis failed: {e}")
@@ -244,7 +245,7 @@ async def text_to_speech(body: TTSRequest):
     # Record TTS timing for analytics
     tts_ms = timer.component_timings.get("tts")
     if tts_ms:
-        _analytics_service.update_tts_latency(body.session_id, tts_ms)
+        fire_and_forget(_analytics_service.update_tts_latency, body.session_id, tts_ms)
 
     # Return audio as WAV file
     timer.end("SUCCESS")
@@ -288,7 +289,7 @@ async def tts_stream(body: TTSStreamRequest):
 
     # Validate session exists
     timer.mark("Validating session")
-    session = _session_service.get_session(body.session_id)
+    session = await run_sync(_session_service.get_session, body.session_id)
     if not session:
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -314,7 +315,7 @@ async def tts_stream(body: TTSStreamRequest):
             # Get RAG context with timing
             timer.mark("RAG: Searching context")
             with timer.component("rag"):
-                context, sources, confidence = _rag_service.search_context(body.message)
+                context, sources, confidence = await run_sync(_rag_service.search_context, body.message)
             timer.mark(f"RAG: Found {len(sources)} sources")
 
             # Build message history
@@ -406,9 +407,10 @@ async def tts_stream(body: TTSStreamRequest):
             # Send completion event
             total_ms = timer.end(f"SUCCESS - {sentence_index} sentences")
 
-            # Record analytics
+            # Record analytics (fire-and-forget)
             timings = timer.get_timings()
-            _analytics_service.record_interaction(
+            fire_and_forget(
+                _analytics_service.record_interaction,
                 session_id=body.session_id,
                 question=body.message,
                 answer=full_response,

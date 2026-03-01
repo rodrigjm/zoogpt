@@ -1,10 +1,10 @@
 # Zoocari Project Plan
 
-> **Last Updated:** 2026-02-24 (Bug fixes verified via Playwright, nginx cache fix, debug cleanup)
+> **Last Updated:** 2026-03-01 (Concurrency optimization implemented — 3-track parallel: multi-worker, async I/O, smaller model)
 > **Status:** Active Development
-> **Branch:** feature/node-fastapi-migration
+> **Branch:** ui_fix
 >
-> **Latest Change:** All bug fixes verified via Playwright end-to-end testing. Bug 1 (input blocking during audio) confirmed working. Bug 3 (KB listing + health check) confirmed: 138 animals displayed, admin container healthy. Added nginx `Cache-Control: no-cache` for `index.html` to prevent stale JS bundles after rebuilds. Removed debug instrumentation code.
+> **Latest Change:** Concurrency optimization deployed & benchmarked. All 3 tracks live: gunicorn 2 workers, async I/O (async_helpers.py), qwen2.5:3b + OLLAMA_NUM_PARALLEL=2. Scaling efficiency 97-114% at 5 concurrent users. Absolute latency targets pending production hardware (MacBook CPU ~18 tok/s is bottleneck).
 
 ---
 
@@ -17,7 +17,7 @@
 | Admin Portal API | ✅ Running | Port 8001, Image Management |
 | Admin Portal Web | ✅ Running | Port 3001, React/TypeScript |
 | Kokoro-TTS | ✅ Healthy | Port 8880, ONNX streaming |
-| Ollama (Phi-4) | ✅ Running | Port 11434, local inference |
+| Ollama (qwen2.5:3b) | ✅ Running | Port 11434, local inference |
 | LlamaGuard | ✅ Active | Content safety via Ollama |
 | LanceDB | ✅ Built | `data/zoo_lancedb/` |
 
@@ -30,7 +30,20 @@
 
 ## Active Features (In Progress)
 
-_No active features in progress._
+### 🔄 Concurrency Optimization
+- **Directory:** `docs/active/concurrency-optimization/`
+- **Status:** Deployed & Benchmarked — Pending Production Verification
+- **Owner:** Main + Backend Agents
+- **Started:** 2026-03-01
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Design & Brainstorming | ✅ Done | 8 options analyzed |
+| Track A: Multi-Worker + Ollama Tuning | ✅ Done | Gunicorn 2 workers, WAL, parallel |
+| Track B: Async I/O + Background Analytics | ✅ Done | async_helpers.py, router wrapping |
+| Track C: Smaller Model (qwen2.5:3b) | ✅ Done | phi4 → qwen2.5:3b |
+| Unit Tests (async_helpers) | ✅ Done | 11/11 passed |
+| Deploy & Benchmark | ✅ Done | All 3 tracks deployed, 97-114% scaling efficiency |
 
 ### ⏸️ Animal Pictures in Chat (Disabled)
 - **Directory:** `docs/active/animal-pictures/`

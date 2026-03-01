@@ -20,6 +20,7 @@ from ..services.safety import (
     SAFE_FALLBACK_RESPONSE,
 )
 from ..utils.timing import RequestTimer
+from ..utils.async_helpers import run_sync, async_wrap_generator, fire_and_forget
 
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -53,7 +54,7 @@ async def chat(body: ChatRequest):
 
     # Validate session exists
     timer.mark("Validating session")
-    session = _session_service.get_session(body.session_id)
+    session = await run_sync(_session_service.get_session, body.session_id)
     if not session:
         timer.end("SESSION_NOT_FOUND")
         return JSONResponse(
@@ -69,11 +70,12 @@ async def chat(body: ChatRequest):
 
     # Safety: Validate input before sending to LLM
     timer.mark("Safety: Validating input")
-    input_check = validate_input(body.message)
+    input_check = await run_sync(validate_input, body.message)
     if not input_check.is_safe:
         timer.end(f"INPUT_BLOCKED: {input_check.reason}")
         # Log blocked message for abuse monitoring
-        _session_service.log_blocked_message(
+        fire_and_forget(
+            _session_service.log_blocked_message,
             body.session_id, body.message, input_check.reason or "safety_filter"
         )
         message_id = str(uuid.uuid4())
@@ -95,7 +97,7 @@ async def chat(body: ChatRequest):
     # RAG retrieval with timing
     timer.mark("RAG: Searching context")
     with timer.component("rag"):
-        context, sources, confidence = _rag_service.search_context(body.message)
+        context, sources, confidence = await run_sync(_rag_service.search_context, body.message)
     timer.mark(f"RAG: Found {len(sources)} sources")
 
     # Build message history
@@ -104,12 +106,12 @@ async def chat(body: ChatRequest):
     # Generate response with timing
     timer.mark("RAG: Generating response")
     with timer.component("llm"):
-        reply = _rag_service.generate_response(messages, context)
+        reply = await run_sync(_rag_service.generate_response, messages, context)
     timer.mark(f"RAG: Response generated ({len(reply)} chars)")
 
     # Safety: Validate LLM output
     timer.mark("Safety: Validating output")
-    output_check = validate_output(reply)
+    output_check = await run_sync(validate_output, reply)
     if not output_check.is_safe:
         timer.end(f"OUTPUT_BLOCKED: {output_check.reason}")
         return {
@@ -124,9 +126,10 @@ async def chat(body: ChatRequest):
 
     total_ms = timer.end("SUCCESS")
 
-    # Record analytics
+    # Record analytics (fire-and-forget)
     timings = timer.get_timings()
-    _analytics_service.record_interaction(
+    fire_and_forget(
+        _analytics_service.record_interaction,
         session_id=body.session_id,
         question=body.message,
         answer=reply,
@@ -137,9 +140,10 @@ async def chat(body: ChatRequest):
         llm_latency_ms=timings.llm_ms,
     )
 
-    # Save chat history for feedback tracking
-    _session_service.save_message(body.session_id, "user", body.message)
-    _session_service.save_message(
+    # Save chat history (fire-and-forget)
+    fire_and_forget(_session_service.save_message, body.session_id, "user", body.message)
+    fire_and_forget(
+        _session_service.save_message,
         body.session_id,
         "assistant",
         reply,
@@ -180,7 +184,7 @@ async def chat_stream(body: ChatRequest):
 
     # Validate session exists (regular JSON response for 404)
     timer.mark("Validating session")
-    session = _session_service.get_session(body.session_id)
+    session = await run_sync(_session_service.get_session, body.session_id)
     if not session:
         timer.end("SESSION_NOT_FOUND")
         return JSONResponse(
@@ -196,11 +200,12 @@ async def chat_stream(body: ChatRequest):
 
     # Safety: Validate input before sending to LLM
     timer.mark("Safety: Validating input")
-    input_check = validate_input(body.message)
+    input_check = await run_sync(validate_input, body.message)
     if not input_check.is_safe:
         timer.end(f"INPUT_BLOCKED: {input_check.reason}")
         # Log blocked message for abuse monitoring
-        _session_service.log_blocked_message(
+        fire_and_forget(
+            _session_service.log_blocked_message,
             body.session_id, body.message, input_check.reason or "safety_filter"
         )
 
@@ -221,7 +226,7 @@ async def chat_stream(body: ChatRequest):
             # RAG retrieval before streaming
             timer.mark("RAG: Searching context")
             with timer.component("rag"):
-                context, sources, confidence = _rag_service.search_context(body.message)
+                context, sources, confidence = await run_sync(_rag_service.search_context, body.message)
             timer.mark(f"RAG: Found {len(sources)} sources")
 
             # Build message history
@@ -237,7 +242,7 @@ async def chat_stream(body: ChatRequest):
             import time
             llm_start = time.perf_counter()
 
-            for chunk_text in _rag_service.generate_response_stream(messages, context):
+            async for chunk_text in async_wrap_generator(_rag_service.generate_response_stream, messages, context):
                 if first_chunk:
                     timer.mark("RAG: First token received")
                     first_chunk = False
@@ -263,9 +268,10 @@ async def chat_stream(body: ChatRequest):
 
             total_ms = timer.end("SUCCESS")
 
-            # Record analytics
+            # Record analytics (fire-and-forget)
             timings = timer.get_timings()
-            _analytics_service.record_interaction(
+            fire_and_forget(
+                _analytics_service.record_interaction,
                 session_id=body.session_id,
                 question=body.message,
                 answer=full_response,
@@ -276,9 +282,10 @@ async def chat_stream(body: ChatRequest):
                 llm_latency_ms=timings.llm_ms,
             )
 
-            # Save chat history for feedback tracking
-            _session_service.save_message(body.session_id, "user", body.message)
-            _session_service.save_message(
+            # Save chat history (fire-and-forget)
+            fire_and_forget(_session_service.save_message, body.session_id, "user", body.message)
+            fire_and_forget(
+                _session_service.save_message,
                 body.session_id,
                 "assistant",
                 full_response,

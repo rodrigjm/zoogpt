@@ -27,6 +27,8 @@ services:
       - zoocari-ollama-models:/root/.ollama
     environment:
       - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_MAX_LOADED_MODELS=1
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 30s
@@ -99,7 +101,7 @@ services:
       - STT_PROVIDER=${STT_PROVIDER:-faster-whisper}
       - KOKORO_TTS_URL=http://kokoro-tts:8880
       - OLLAMA_URL=http://ollama:11434
-      - OLLAMA_MODEL=phi4
+      - OLLAMA_MODEL=qwen2.5:3b
       - OLLAMA_GUARD_MODEL=llama-guard3:1b
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - LANCEDB_PATH=/app/data/zoo_lancedb
@@ -121,7 +123,7 @@ services:
         limits:
           memory: 4G
         reservations:
-          memory: 2G
+          memory: 3G
     logging:
       driver: "json-file"
       options:
