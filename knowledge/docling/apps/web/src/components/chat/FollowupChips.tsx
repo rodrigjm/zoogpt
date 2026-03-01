@@ -26,11 +26,12 @@ export default function FollowupChips({ questions, onSelect }: FollowupChipsProp
           className="
             flex-shrink-0 snap-start
             px-4 py-2 min-h-[44px]
-            bg-chat-surface hover:bg-accent-primary
+            bg-chat-surface hover:bg-accent-teal
             text-text-primary hover:text-white
+            border border-accent-secondary/25 hover:border-accent-teal
             rounded-full text-sm font-body
             transition-colors duration-200
-            whitespace-nowrap
+            whitespace-nowrap cursor-pointer
             active:scale-95
           "
           type="button"

@@ -11,18 +11,18 @@ export const ModeToggle: React.FC = () => {
   const toggleInputMode = useUIStore((state) => state.toggleInputMode);
 
   return (
-    <div className="inline-flex bg-chat-surface rounded-full p-1">
+    <div className="inline-flex bg-white/20 backdrop-blur-sm rounded-full p-1">
       {/* Voice mode button */}
       <button
         type="button"
         onClick={() => inputMode !== 'voice' && toggleInputMode()}
         className={`
           min-h-[44px] min-w-[44px] px-4 py-2 rounded-full
-          flex items-center gap-2 transition-all duration-200
+          flex items-center gap-2 transition-all duration-200 cursor-pointer
           ${
             inputMode === 'voice'
-              ? 'bg-accent-primary text-white shadow-sm'
-              : 'text-text-secondary hover:text-text-primary'
+              ? 'bg-white text-accent-primary shadow-sm font-bold'
+              : 'text-white/80 hover:text-white'
           }
         `}
         aria-label="Voice mode"
@@ -46,11 +46,11 @@ export const ModeToggle: React.FC = () => {
         onClick={() => inputMode !== 'text' && toggleInputMode()}
         className={`
           min-h-[44px] min-w-[44px] px-4 py-2 rounded-full
-          flex items-center gap-2 transition-all duration-200
+          flex items-center gap-2 transition-all duration-200 cursor-pointer
           ${
             inputMode === 'text'
-              ? 'bg-accent-primary text-white shadow-sm'
-              : 'text-text-secondary hover:text-text-primary'
+              ? 'bg-white text-accent-primary shadow-sm font-bold'
+              : 'text-white/80 hover:text-white'
           }
         `}
         aria-label="Text mode"

@@ -27,7 +27,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
       </main>
 
       {/* Sticky footer with safe area padding */}
-      <footer className="sticky bottom-0 bg-chat-elevated border-t border-black/5 pb-[env(safe-area-inset-bottom)]">
+      <footer className="sticky bottom-0 bg-chat-canvas border-t border-accent-secondary/15 pb-[env(safe-area-inset-bottom)]">
         {footer}
       </footer>
     </div>

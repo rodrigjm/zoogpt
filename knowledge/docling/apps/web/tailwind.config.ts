@@ -8,47 +8,49 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Existing Leesburg brand colors
+        // Leesburg brand colors (kept for reference)
         'leesburg-yellow': '#f5d224',
         'leesburg-brown': '#3d332a',
         'leesburg-beige': '#f4f2ef',
         'leesburg-orange': '#f29021',
         'leesburg-blue': '#76b9db',
 
-        // Chat redesign - semantic tokens
+        // Chat redesign - African Zoo / Warm Vibrant palette
         'chat': {
-          'canvas': '#FDFCFA',
-          'surface': '#F7F5F2',
+          'canvas': '#FFFAF5',
+          'surface': '#FFF3E8',
           'elevated': '#FFFFFF',
         },
         'bubble': {
-          'user': '#4A6741',
+          'user': '#E07A2F',
           'user-text': '#FFFFFF',
-          'assistant': '#F4F2EF',
-          'assistant-text': '#3D332A',
+          'assistant': '#FFF3E8',
+          'assistant-text': '#2D1810',
         },
         'accent': {
-          'primary': '#4A6741',
-          'primary-hover': '#3D5636',
-          'secondary': '#F5D224',
-          'error': '#C45C4A',
-          'success': '#5D8A5A',
+          'primary': '#E07A2F',
+          'primary-hover': '#C96821',
+          'secondary': '#F5B731',
+          'teal': '#2A9D8F',
+          'teal-hover': '#238578',
+          'error': '#E85D4A',
+          'success': '#2A9D8F',
         },
         'text': {
-          'primary': '#2D2620',
-          'secondary': '#6B635B',
-          'muted': '#9C948B',
+          'primary': '#2D1810',
+          'secondary': '#7A5C4F',
+          'muted': '#B49A8C',
         },
         'voice': {
-          'idle': '#4A6741',
+          'idle': '#2A9D8F',
           'recording': '#E85D4A',
-          'processing': '#F5D224',
+          'processing': '#F5B731',
           'playing': '#76B9DB',
         },
       },
       fontFamily: {
-        'heading': ['Nunito', 'system-ui', 'sans-serif'],
-        'body': ['Inter', 'system-ui', 'sans-serif'],
+        'heading': ['"Baloo 2"', 'system-ui', 'sans-serif'],
+        'body': ['"Comic Neue"', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         'bubble': '20px',
@@ -75,6 +77,10 @@ export default {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        'float': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-6px)' },
+        },
       },
       animation: {
         fadeIn: 'fadeIn 0.3s ease-out',
@@ -82,6 +88,7 @@ export default {
         'pulse-ring': 'pulse-ring 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'typing-dot': 'typing-dot 1.4s infinite ease-in-out',
         'message-in': 'message-in 200ms ease-out',
+        'float': 'float 3s ease-in-out infinite',
       },
     },
   },

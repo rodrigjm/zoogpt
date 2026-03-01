@@ -55,7 +55,7 @@ export default function InputBar({ onSend, disabled = false }: InputBarProps) {
       <div
         className="
           flex-1 bg-chat-surface rounded-full
-          border border-black/10
+          border-2 border-accent-secondary/30
           focus-within:border-accent-primary focus-within:ring-2 focus-within:ring-accent-primary/20
           transition-all duration-200
           px-4 py-2
@@ -74,7 +74,7 @@ export default function InputBar({ onSend, disabled = false }: InputBarProps) {
             w-full resize-none bg-transparent
             text-base text-text-primary placeholder:text-text-muted
             outline-none border-none
-            overflow-y-auto
+            overflow-y-auto font-body
           "
           style={{
             minHeight: '24px',

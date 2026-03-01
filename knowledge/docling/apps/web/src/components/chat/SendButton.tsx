@@ -12,8 +12,8 @@ export default function SendButton({ onClick, disabled = false }: SendButtonProp
       disabled={disabled}
       className="
         w-12 h-12 rounded-full flex items-center justify-center
-        bg-accent-primary hover:bg-accent-primary-hover
-        shadow-md transition-all duration-200
+        bg-accent-teal hover:bg-accent-teal-hover
+        shadow-md transition-all duration-200 cursor-pointer
         active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed
       "
       aria-label="Send message"

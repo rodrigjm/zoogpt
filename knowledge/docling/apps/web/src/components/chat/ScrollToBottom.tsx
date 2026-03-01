@@ -18,10 +18,10 @@ export const ScrollToBottom: React.FC<ScrollToBottomProps> = ({ onClick }) => {
       className="
         fixed bottom-24 right-4 z-20
         min-h-[44px] min-w-[44px]
-        bg-accent-primary text-white
+        bg-accent-teal text-white
         rounded-full shadow-lg
         flex items-center justify-center
-        hover:bg-accent-primary-hover
+        hover:bg-accent-teal-hover cursor-pointer
         active:scale-95
         transition-all duration-200
         animate-message-in

@@ -11,9 +11,9 @@ interface Animal {
 }
 
 const animals: Animal[] = [
-  { name: 'Lion', thumb: '/images/animals/lion_1.webp' },
-  { name: 'Elephant', thumb: '/images/animals/elephant_1.webp' },
-  { name: 'Giraffe', thumb: '/images/animals/giraffe_1.webp' },
+  { name: 'Poison Dart Frog', thumb: '/images/animals/poison_dart_frog_1.webp' },
+  { name: 'Zebra', thumb: '/images/animals/zebra_1.webp' },
+  { name: 'Red Macaw', thumb: '/images/animals/macaw_1.webp' },
   { name: 'Camel', thumb: '/images/animals/camel_1.webp' },
   { name: 'Emu', thumb: '/images/animals/emu_1.webp' },
   { name: 'Serval', thumb: '/images/animals/serval_1.webp' },
