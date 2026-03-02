@@ -1,0 +1,17 @@
+requests
+ipykernel
+python-dotenv
+openai
+pydantic
+docling
+lancedb
+streamlit
+tiktoken
+transformers
+elevenlabs
+# Kokoro TTS - Local inference
+kokoro>=0.9.4
+soundfile
+
+# Faster-Whisper - Local STT inference (Phase 1 Voice Upgrade)
+faster-whisper>=1.0.0

@@ -1,0 +1,108 @@
+# ============================================================
+# Zoocari LEGACY - Original Streamlit Application
+# ============================================================
+#
+# This is the preserved legacy Streamlit app for rollback purposes.
+#
+# Quick Start (from legacy/ directory):
+#   docker compose up --build
+#
+# Environment Variables (set in .env or pass directly):
+#   - OPENAI_API_KEY (required): OpenAI API key for chat & STT
+#   - ELEVENLABS_API_KEY (optional): Fallback TTS provider
+#   - TTS_VOICE (optional): Kokoro voice ID (default: af_heart)
+#
+# ============================================================
+
+services:
+  zoocari-legacy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zoocari-legacy
+    ports:
+      - "8501:8501"
+
+    volumes:
+      # Persist vector database between container restarts
+      - ../data:/app/data
+
+      # Persist Hugging Face model cache (Kokoro, spaCy models)
+      # This prevents re-downloading models on container restart
+      - zoocari-legacy-hf-cache:/app/.cache/huggingface
+
+      # Persist PyTorch cache
+      - zoocari-legacy-torch-cache:/app/.cache/torch
+
+    environment:
+      # Required
+      - OPENAI_API_KEY=${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+
+      # Optional: ElevenLabs fallback TTS
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY:-}
+
+      # TTS Configuration (openai is fastest for Docker, kokoro only for native/GPU)
+      - TTS_VOICE=${TTS_VOICE:-nova}
+      - TTS_PROVIDER=${TTS_PROVIDER:-openai}
+
+      # Python settings for unbuffered logging
+      - PYTHONUNBUFFERED=1
+
+      # Hugging Face cache location
+      - HF_HOME=/app/.cache/huggingface
+      - TORCH_HOME=/app/.cache/torch
+
+    env_file:
+      - path: .env
+        required: false
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Resource limits (adjust based on your hardware)
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================================
+  # Cloudflare Tunnel (HTTPS for mobile voice support)
+  # ============================================================
+  # Provides secure HTTPS access required for browser microphone API.
+  # See CLOUDFLARE_TUNNEL_SETUP.md for configuration steps.
+  #
+  # Prerequisites:
+  #   1. Create tunnel: cloudflared tunnel create zoocari
+  #   2. Add credentials.json to ./cloudflare/
+  #   3. Set CLOUDFLARE_TUNNEL_TOKEN in .env (or use credentials file)
+  # ============================================================
+  cloudflared-legacy:
+    image: cloudflare/cloudflared:latest
+    container_name: zoocari-legacy-tunnel
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:-}
+    volumes:
+      # Mount tunnel credentials and config
+      - ../cloudflare:/etc/cloudflared:ro
+    depends_on:
+      - zoocari-legacy
+    profiles:
+      - tunnel  # Only start with: docker compose --profile tunnel up
+
+# Named volumes for persistent model cache
+volumes:
+  zoocari-legacy-hf-cache:
+    name: zoocari-legacy-hf-cache
+  zoocari-legacy-torch-cache:
+    name: zoocari-legacy-torch-cache

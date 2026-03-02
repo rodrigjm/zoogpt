@@ -1,0 +1,14 @@
+# Override to use host Ollama instead of container
+services:
+  # Update API to connect to host Ollama and remove Ollama dependency
+  api:
+    depends_on:
+      - kokoro-tts
+    environment:
+      - OLLAMA_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Disable Ollama container
+  ollama:
+    scale: 0

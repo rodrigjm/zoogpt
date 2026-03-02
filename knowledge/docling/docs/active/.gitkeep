@@ -1,0 +1,3 @@
+# Active feature directories go here
+# Each feature gets its own subdirectory: docs/active/<feature-name>/
+# When complete, move entire directory to docs/archive/

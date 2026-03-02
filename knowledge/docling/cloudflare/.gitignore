@@ -1,0 +1,7 @@
+# Cloudflare Tunnel Secrets
+# These files contain sensitive credentials - never commit!
+credentials.json
+*.json
+
+# Keep config.yml as a template
+!config.yml
