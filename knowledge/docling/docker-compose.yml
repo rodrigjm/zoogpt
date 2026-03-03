@@ -101,7 +101,7 @@ services:
       - STT_PROVIDER=${STT_PROVIDER:-faster-whisper}
       - KOKORO_TTS_URL=http://kokoro-tts:8880
       - OLLAMA_URL=http://ollama:11434
-      - OLLAMA_MODEL=qwen2.5:3b
+      - OLLAMA_MODEL=llama3.2:3b
       - OLLAMA_GUARD_MODEL=llama-guard3:1b
       - LLM_PROVIDER=${LLM_PROVIDER:-ollama}
       - LANCEDB_PATH=/app/data/zoo_lancedb
