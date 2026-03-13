@@ -14,6 +14,7 @@ from typing import Optional
 
 from openai import OpenAI
 
+from ..config import settings
 from ..utils.timing import timed_print
 
 logger = logging.getLogger(__name__)
@@ -206,9 +207,20 @@ class STTService:
         Raises:
             Exception: If all transcription methods fail
         """
-        logger.info(f"[STT] Starting transcription for {len(audio_bytes)} bytes")
+        logger.info(f"[STT] Starting transcription for {len(audio_bytes)} bytes (provider: {settings.stt_provider})")
 
-        # 1. Try local Faster-Whisper first
+        # If provider is explicitly set to openai, skip local
+        if settings.stt_provider == "openai":
+            logger.info("[STT] Provider set to OpenAI, using cloud API")
+            try:
+                text = self.transcribe_openai(audio_bytes)
+                logger.info("[STT] OpenAI Whisper succeeded")
+                return text
+            except Exception as e:
+                logger.error(f"[STT] OpenAI transcription failed: {e}")
+                raise
+
+        # 1. Try local Faster-Whisper first (default behavior)
         if is_faster_whisper_available():
             logger.info("[STT] Attempting Faster-Whisper (local)...")
             try:

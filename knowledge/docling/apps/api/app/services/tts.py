@@ -15,7 +15,7 @@ import numpy as np
 import soundfile as sf
 from openai import OpenAI
 
-from ..config import dynamic_config
+from ..config import dynamic_config, settings
 from ..utils.timing import timed_print
 
 logger = logging.getLogger(__name__)
@@ -331,9 +331,20 @@ class TTSService:
         Raises:
             Exception: If all TTS methods fail
         """
-        logger.info(f"[TTS] Starting synthesis for {len(text)} chars, voice={voice}")
+        logger.info(f"[TTS] Starting synthesis for {len(text)} chars, voice={voice} (provider: {settings.tts_provider})")
 
-        # 1. Try local Kokoro first
+        # If provider is explicitly set to openai, skip local
+        if settings.tts_provider == "openai":
+            logger.info("[TTS] Provider set to OpenAI, using cloud API")
+            try:
+                audio = self.synthesize_openai(text, voice=voice)
+                logger.info("[TTS] OpenAI TTS succeeded")
+                return audio
+            except Exception as e:
+                logger.error(f"[TTS] OpenAI TTS failed: {e}")
+                raise
+
+        # 1. Try local Kokoro first (default behavior)
         if is_kokoro_available():
             logger.info("[TTS] Attempting Kokoro (local)...")
             try:
