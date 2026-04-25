@@ -47,6 +47,20 @@ export default function StageCard({
 
   const providerNames = Object.keys(models)
 
+  // If saved model isn't in the catalog (e.g. legacy config or null), fall back
+  // to the first available model under the saved provider so the dropdown shows
+  // a valid selection on first paint.
+  useEffect(() => {
+    if (!selectedModel && models[selectedProvider]?.length) {
+      setSelectedModel(models[selectedProvider][0].id)
+      return
+    }
+    const validIds = models[selectedProvider]?.map((m) => m.id) ?? []
+    if (selectedModel && validIds.length && !validIds.includes(selectedModel)) {
+      setSelectedModel(validIds[0])
+    }
+  }, [models, selectedProvider, selectedModel])
+
   const handleProviderModelChange = (value: string) => {
     const [prov, ...modelParts] = value.split('/')
     const model = modelParts.join('/')

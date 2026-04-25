@@ -79,7 +79,7 @@ async def get_pipeline_config(user: User = Depends(get_current_user)):
     return PipelineConfig(
         stt=PipelineStageConfig(
             provider=pipeline.get("stt", {}).get("provider", "faster-whisper"),
-            model=pipeline.get("stt", {}).get("model"),
+            model=pipeline.get("stt", {}).get("model", "base"),
         ),
         llm=PipelineStageConfig(
             provider=pipeline.get("llm", {}).get("provider", "ollama"),
