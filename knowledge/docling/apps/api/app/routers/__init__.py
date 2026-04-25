@@ -6,10 +6,12 @@ from .session import router as session_router
 from .chat import router as chat_router
 from .voice import router as voice_router
 from .feedback import router as feedback_router
+from .benchmark import router as benchmark_router
 
 __all__ = [
     "session_router",
     "chat_router",
     "voice_router",
     "feedback_router",
+    "benchmark_router",
 ]

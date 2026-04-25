@@ -332,10 +332,12 @@ class TTSService:
         Raises:
             Exception: If all TTS methods fail
         """
-        logger.info(f"[TTS] Starting synthesis for {len(text)} chars, voice={voice} (provider: {settings.tts_provider})")
+        provider = dynamic_config.pipeline_tts_provider or settings.tts_provider
+        voice = dynamic_config.pipeline_tts_model or voice or dynamic_config.tts_default_voice
+        logger.info(f"[TTS] Starting synthesis for {len(text)} chars, voice={voice} (provider: {provider})")
 
         # If provider is explicitly set to openai, skip local
-        if settings.tts_provider == "openai":
+        if provider == "openai":
             logger.info("[TTS] Provider set to OpenAI, using cloud API")
             try:
                 audio = await self.synthesize_openai(text, voice=voice)

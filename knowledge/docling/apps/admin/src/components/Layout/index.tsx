@@ -4,6 +4,7 @@ import clsx from 'clsx'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: '📊' },
+  { to: '/pipeline', label: 'Pipeline', icon: '🔧' },
   { to: '/sessions', label: 'Sessions', icon: '💬' },
   { to: '/interactions', label: 'Q&A Pairs', icon: '❓' },
   { to: '/knowledge-base', label: 'Knowledge Base', icon: '📚' },
