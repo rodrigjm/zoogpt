@@ -184,56 +184,21 @@ async def run_single_e2e(session: aiohttp.ClientSession, question: str) -> StepT
             timing.error = "Empty chat reply"
             return timing
 
-        # ── Step 3: TTS ─────────────────────────────────────────────
+        # ── Step 3: TTS (sync endpoint for accurate timing) ─────────
         t0 = time.perf_counter()
-        first_audio = False
         audio_size = 0
 
         async with session.post(
-            f"{BASE_URL}/api/voice/tts/stream",
-            json={"session_id": session_id, "message": question},
-        ) as resp:
-            if resp.status != 200:
-                # Fallback to sync TTS
-                async with session.post(
-                    f"{BASE_URL}/api/voice/tts",
-                    json={"session_id": session_id, "text": timing.reply_text},
-                ) as tts_resp:
-                    if tts_resp.status == 200:
-                        audio_data = await tts_resp.read()
-                        audio_size = len(audio_data)
-                        timing.tts_first_chunk_ms = (time.perf_counter() - t0) * 1000
-                        timing.tts_total_ms = timing.tts_first_chunk_ms
-                    else:
-                        timing.error = f"TTS failed: {tts_resp.status}"
-                        return timing
+            f"{BASE_URL}/api/voice/tts",
+            json={"session_id": session_id, "text": timing.reply_text},
+        ) as tts_resp:
+            if tts_resp.status == 200:
+                audio_data = await tts_resp.read()
+                audio_size = len(audio_data)
+                timing.tts_first_chunk_ms = (time.perf_counter() - t0) * 1000
             else:
-                async for line in resp.content:
-                    decoded = line.decode("utf-8").strip()
-                    if not decoded:
-                        continue
-                    if decoded.startswith("data: "):
-                        decoded = decoded[6:]
-                    elif decoded.startswith("event:"):
-                        continue
-
-                    try:
-                        chunk = json.loads(decoded)
-                    except json.JSONDecodeError:
-                        continue
-
-                    if chunk.get("chunk") or chunk.get("type") == "audio":
-                        if not first_audio:
-                            timing.tts_first_chunk_ms = (time.perf_counter() - t0) * 1000
-                            first_audio = True
-                        audio_b64 = chunk.get("chunk") or chunk.get("data", "")
-                        if audio_b64:
-                            try:
-                                audio_size += len(base64.b64decode(audio_b64))
-                            except Exception:
-                                audio_size += len(audio_b64)
-                    elif chunk.get("type") == "done":
-                        break
+                timing.error = f"TTS failed: {tts_resp.status}"
+                return timing
 
         timing.tts_total_ms = (time.perf_counter() - t0) * 1000
         timing.tts_audio_bytes = audio_size

@@ -3,13 +3,14 @@ RAG service for Zoocari chatbot.
 Implements LanceDB retrieval and LLM response generation (Ollama-first, OpenAI fallback).
 """
 
+import asyncio
 import re
 import json
 import httpx
 import lancedb
 from datetime import datetime
 from pathlib import Path
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from ..config import settings, dynamic_config
 from ..utils.timing import timed_print
@@ -112,10 +113,10 @@ class RAGService:
         return self._table
 
     @property
-    def openai_client(self) -> OpenAI:
-        """Lazy-load OpenAI client."""
+    def openai_client(self) -> AsyncOpenAI:
+        """Lazy-load async OpenAI client."""
         if self._openai_client is None:
-            self._openai_client = OpenAI(api_key=settings.openai_api_key)
+            self._openai_client = AsyncOpenAI(api_key=settings.openai_api_key)
         return self._openai_client
 
     @property
@@ -237,7 +238,7 @@ class RAGService:
 
         return None
 
-    def search_context(
+    async def search_context(
         self, query: str, num_results: int = 5
     ) -> tuple[str, list[dict], float]:
         """
@@ -250,9 +251,11 @@ class RAGService:
         Returns:
             Tuple of (context_string, sources_list, confidence_score)
         """
-        # Search the table (using to_list() to avoid pandas dependency)
+        # Search the table in a thread (LanceDB is sync-only)
         timed_print(f"  [RAG] LanceDB query: '{query[:40]}...'")
-        results = self.table.search(query).limit(num_results).to_list()
+        results = await asyncio.to_thread(
+            lambda: self.table.search(query).limit(num_results).to_list()
+        )
         timed_print(f"  [RAG] LanceDB returned {len(results)} results")
 
         contexts = []
@@ -318,7 +321,7 @@ class RAGService:
 
         return context_string, sources, confidence
 
-    def generate_response(self, messages: list[dict], context: str) -> str:
+    async def generate_response(self, messages: list[dict], context: str) -> str:
         """
         Generate response using LLM (Ollama or OpenAI) with Zoocari persona.
 
@@ -340,7 +343,7 @@ class RAGService:
 
         # Generate response using LLM service (local-first with cloud fallback)
         timed_print(f"  [RAG] LLM generation starting (provider: {settings.llm_provider})")
-        response = self.llm_service.generate(
+        response = await self.llm_service.generate(
             messages=messages_with_context,
             model=dynamic_config.model_name,
             temperature=dynamic_config.model_temperature,
@@ -350,9 +353,9 @@ class RAGService:
 
         return response
 
-    def _stream_ollama(self, messages_with_context: list[dict]):
+    async def _stream_ollama(self, messages_with_context: list[dict]):
         """
-        Stream response from Ollama.
+        Stream response from Ollama (async).
 
         Args:
             messages_with_context: Messages with system prompt
@@ -360,9 +363,12 @@ class RAGService:
         Yields:
             Text chunks from Ollama streaming response
         """
+        from .llm import _get_async_httpx_client
+
         timed_print(f"  [RAG] Ollama streaming API call starting ({settings.ollama_model})")
 
-        with httpx.stream(
+        client = _get_async_httpx_client()
+        async with client.stream(
             "POST",
             f"{settings.ollama_url}/api/chat",
             json={
@@ -374,13 +380,11 @@ class RAGService:
                     "num_predict": dynamic_config.model_max_tokens
                 }
             },
-            timeout=60.0
         ) as response:
             response.raise_for_status()
             first_chunk = True
-            for line in response.iter_lines():
+            async for line in response.aiter_lines():
                 if line:
-                    import json
                     data = json.loads(line)
                     if "message" in data and "content" in data["message"]:
                         content = data["message"]["content"]
@@ -391,9 +395,9 @@ class RAGService:
                             yield content
         timed_print("  [RAG] Ollama streaming complete")
 
-    def _stream_openai(self, messages_with_context: list[dict]):
+    async def _stream_openai(self, messages_with_context: list[dict]):
         """
-        Stream response from OpenAI.
+        Stream response from OpenAI (async).
 
         Args:
             messages_with_context: Messages with system prompt
@@ -403,7 +407,7 @@ class RAGService:
         """
         model_name = dynamic_config.model_name
         timed_print(f"  [RAG] OpenAI streaming API call starting ({model_name})")
-        stream = self.openai_client.chat.completions.create(
+        stream = await self.openai_client.chat.completions.create(
             model=model_name,
             messages=messages_with_context,
             temperature=dynamic_config.model_temperature,
@@ -412,7 +416,7 @@ class RAGService:
         )
 
         first_chunk = True
-        for chunk in stream:
+        async for chunk in stream:
             if chunk.choices[0].delta.content is not None:
                 if first_chunk:
                     timed_print("  [RAG] OpenAI first streaming chunk received")
@@ -420,7 +424,7 @@ class RAGService:
                 yield chunk.choices[0].delta.content
         timed_print("  [RAG] OpenAI streaming complete")
 
-    def generate_response_stream(self, messages: list[dict], context: str):
+    async def generate_response_stream(self, messages: list[dict], context: str):
         """
         Generate streaming response using LLM (Ollama-first, OpenAI fallback) with Zoocari persona.
 
@@ -441,17 +445,19 @@ class RAGService:
         ]
 
         # Try Ollama first if configured and available
-        if settings.llm_provider == "ollama" and is_ollama_available():
+        if settings.llm_provider == "ollama" and await is_ollama_available():
             try:
                 timed_print(f"  [RAG] Using Ollama for streaming (provider: {settings.llm_provider})")
-                yield from self._stream_ollama(messages_with_context)
+                async for chunk in self._stream_ollama(messages_with_context):
+                    yield chunk
                 return
             except Exception as e:
                 timed_print(f"  [RAG] Ollama streaming failed, falling back to OpenAI: {e}")
 
         # Fallback to OpenAI
         timed_print(f"  [RAG] Using OpenAI for streaming (provider: {settings.llm_provider})")
-        yield from self._stream_openai(messages_with_context)
+        async for chunk in self._stream_openai(messages_with_context):
+            yield chunk
 
     def extract_followup_questions(self, response: str) -> tuple[str, list[str]]:
         """

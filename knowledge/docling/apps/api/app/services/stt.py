@@ -12,7 +12,7 @@ import tempfile
 import os
 from typing import Optional
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from ..config import settings
 from ..utils.timing import timed_print
@@ -68,7 +68,7 @@ class STTService:
         Args:
             openai_api_key: OpenAI API key for cloud fallback
         """
-        self.openai_client = OpenAI(api_key=openai_api_key)
+        self.openai_client = AsyncOpenAI(api_key=openai_api_key)
 
     def transcribe_local(self, audio_bytes: bytes) -> str:
         """
@@ -159,7 +159,7 @@ class STTService:
         """
         return self._detect_audio_format(audio_bytes) is not None
 
-    def transcribe_openai(self, audio_bytes: bytes) -> str:
+    async def transcribe_openai(self, audio_bytes: bytes) -> str:
         """
         Transcribe audio using OpenAI Whisper API.
 
@@ -182,7 +182,7 @@ class STTService:
         audio_file.name = f"recording.{audio_format}"
         timed_print(f"  [STT] OpenAI Whisper API call starting ({audio_format})...")
 
-        transcription = self.openai_client.audio.transcriptions.create(
+        transcription = await self.openai_client.audio.transcriptions.create(
             model="whisper-1",
             file=audio_file,
             language="en",
@@ -190,7 +190,7 @@ class STTService:
         timed_print(f"  [STT] OpenAI Whisper done: '{transcription.text[:30]}...' ({len(transcription.text)} chars)")
         return transcription.text
 
-    def transcribe(self, audio_bytes: bytes) -> str:
+    async def transcribe(self, audio_bytes: bytes) -> str:
         """
         Transcribe audio with local-first, cloud fallback strategy.
 
@@ -213,7 +213,7 @@ class STTService:
         if settings.stt_provider == "openai":
             logger.info("[STT] Provider set to OpenAI, using cloud API")
             try:
-                text = self.transcribe_openai(audio_bytes)
+                text = await self.transcribe_openai(audio_bytes)
                 logger.info("[STT] OpenAI Whisper succeeded")
                 return text
             except Exception as e:
@@ -235,7 +235,7 @@ class STTService:
         # 2. Fall back to OpenAI Whisper API
         logger.info("[STT] Attempting OpenAI Whisper (cloud)...")
         try:
-            text = self.transcribe_openai(audio_bytes)
+            text = await self.transcribe_openai(audio_bytes)
             logger.info("[STT] OpenAI Whisper succeeded")
             return text
         except Exception as e:

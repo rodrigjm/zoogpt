@@ -143,6 +143,7 @@
   - [ ] Refactor TTS/LLM/STT services to use `AsyncOpenAI` client (~7 files)
   - [ ] Wrap sync LanceDB search in `asyncio.to_thread()` (~1 file)
   - [ ] Parallelize TTS sentence synthesis in `/tts/stream` endpoint (~1 file)
+- [ ] **Admin Portal Load Testing Dashboard** — Expose load testing from the admin UI. Run configurable concurrency tests (1/5/10/20 sessions), display E2E latency breakdown per pipeline step (session → chat/RAG/LLM → TTS → audio), cost-per-request estimates, and p50/p95/p99 percentiles. Based on `scripts/load_test.py`. Requires: admin API endpoint to trigger/poll test runs, results storage, and admin UI panel with charts. Should show historical results to track perf regressions across deploys.
 - [ ] Mobile app companion
 - [ ] Offline mode support
 

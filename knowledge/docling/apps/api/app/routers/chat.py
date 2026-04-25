@@ -20,7 +20,7 @@ from ..services.safety import (
     SAFE_FALLBACK_RESPONSE,
 )
 from ..utils.timing import RequestTimer
-from ..utils.async_helpers import run_sync, async_wrap_generator, fire_and_forget
+from ..utils.async_helpers import run_sync, fire_and_forget
 
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -97,7 +97,7 @@ async def chat(body: ChatRequest):
     # RAG retrieval with timing
     timer.mark("RAG: Searching context")
     with timer.component("rag"):
-        context, sources, confidence = await run_sync(_rag_service.search_context, body.message)
+        context, sources, confidence = await _rag_service.search_context(body.message)
     timer.mark(f"RAG: Found {len(sources)} sources")
 
     # Build message history
@@ -106,7 +106,7 @@ async def chat(body: ChatRequest):
     # Generate response with timing
     timer.mark("RAG: Generating response")
     with timer.component("llm"):
-        reply = await run_sync(_rag_service.generate_response, messages, context)
+        reply = await _rag_service.generate_response(messages, context)
     timer.mark(f"RAG: Response generated ({len(reply)} chars)")
 
     # Safety: Validate LLM output
@@ -226,7 +226,7 @@ async def chat_stream(body: ChatRequest):
             # RAG retrieval before streaming
             timer.mark("RAG: Searching context")
             with timer.component("rag"):
-                context, sources, confidence = await run_sync(_rag_service.search_context, body.message)
+                context, sources, confidence = await _rag_service.search_context(body.message)
             timer.mark(f"RAG: Found {len(sources)} sources")
 
             # Build message history
@@ -242,7 +242,7 @@ async def chat_stream(body: ChatRequest):
             import time
             llm_start = time.perf_counter()
 
-            async for chunk_text in async_wrap_generator(_rag_service.generate_response_stream, messages, context):
+            async for chunk_text in _rag_service.generate_response_stream(messages, context):
                 if first_chunk:
                     timer.mark("RAG: First token received")
                     first_chunk = False

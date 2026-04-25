@@ -141,7 +141,7 @@ async def speech_to_text(
     # Transcribe audio using STT service
     try:
         timer.mark("Starting transcription")
-        text = _stt_service.transcribe(audio_bytes)
+        text = await _stt_service.transcribe(audio_bytes)
         timer.mark(f"Transcription complete: '{text[:50]}...' ({len(text)} chars)")
     except Exception as e:
         logger.error(f"STT transcription failed: {e}")
@@ -226,7 +226,7 @@ async def text_to_speech(body: TTSRequest):
     try:
         timer.mark("Starting TTS synthesis")
         with timer.component("tts"):
-            audio_bytes = await run_sync(_tts_service.synthesize, text=body.text, voice=body.voice)
+            audio_bytes = await _tts_service.synthesize(text=body.text, voice=body.voice)
         timer.mark(f"Synthesis complete: {len(audio_bytes)} bytes audio")
     except Exception as e:
         logger.error(f"TTS synthesis failed: {e}")
@@ -315,7 +315,7 @@ async def tts_stream(body: TTSStreamRequest):
             # Get RAG context with timing
             timer.mark("RAG: Searching context")
             with timer.component("rag"):
-                context, sources, confidence = await run_sync(_rag_service.search_context, body.message)
+                context, sources, confidence = await _rag_service.search_context(body.message)
             timer.mark(f"RAG: Found {len(sources)} sources")
 
             # Build message history
@@ -326,7 +326,7 @@ async def tts_stream(body: TTSStreamRequest):
             first_chunk = True
             llm_start = time_module.perf_counter()
 
-            for chunk in _rag_service.generate_response_stream(messages, context):
+            async for chunk in _rag_service.generate_response_stream(messages, context):
                 if first_chunk:
                     timer.mark("RAG: First token received")
                     first_chunk = False
@@ -347,10 +347,9 @@ async def tts_stream(body: TTSStreamRequest):
                             # Generate audio for this sentence with timing
                             timer.mark(f"TTS: Synthesizing sentence {sentence_index}")
                             tts_start = time_module.perf_counter()
-                            audio_bytes = _tts_service.synthesize_kokoro(
+                            audio_bytes = await _tts_service.synthesize(
                                 sentence,
                                 voice=body.voice,
-                                chunk_long_text=False  # Already chunked by sentence
                             )
                             tts_total_ms += int((time_module.perf_counter() - tts_start) * 1000)
                             audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
@@ -380,10 +379,9 @@ async def tts_stream(body: TTSStreamRequest):
                 try:
                     timer.mark(f"TTS: Synthesizing final buffer")
                     tts_start = time_module.perf_counter()
-                    audio_bytes = _tts_service.synthesize_kokoro(
+                    audio_bytes = await _tts_service.synthesize(
                         buffer.strip(),
                         voice=body.voice,
-                        chunk_long_text=False
                     )
                     tts_total_ms += int((time_module.perf_counter() - tts_start) * 1000)
                     audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')

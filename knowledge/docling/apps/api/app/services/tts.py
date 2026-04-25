@@ -13,7 +13,8 @@ from typing import Optional
 
 import numpy as np
 import soundfile as sf
-from openai import OpenAI
+import asyncio
+from openai import AsyncOpenAI
 
 from ..config import dynamic_config, settings
 from ..utils.timing import timed_print
@@ -191,7 +192,7 @@ class TTSService:
             openai_api_key: OpenAI API key for cloud fallback
             default_voice: Default voice preset to use
         """
-        self.openai_client = OpenAI(api_key=openai_api_key)
+        self.openai_client = AsyncOpenAI(api_key=openai_api_key)
         self.default_voice = default_voice
 
     def synthesize_kokoro(
@@ -257,13 +258,13 @@ class TTSService:
         timed_print(f"  [TTS] Kokoro-ONNX done: {len(full_audio)} samples, {len(buffer.getvalue())} bytes")
         return buffer.read()
 
-    def synthesize_openai(
+    async def synthesize_openai(
         self,
         text: str,
         voice: str = "nova"
     ) -> bytes:
         """
-        Generate speech using OpenAI TTS API.
+        Generate speech using OpenAI TTS API (async).
 
         Args:
             text: Text to convert to speech
@@ -296,18 +297,18 @@ class TTSService:
         truncated_text = clean_text[:4096]
 
         timed_print(f"  [TTS] OpenAI API call starting (voice={openai_voice})...")
-        with self.openai_client.audio.speech.with_streaming_response.create(
+        async with self.openai_client.audio.speech.with_streaming_response.create(
             model="tts-1",
             voice=openai_voice,
             input=truncated_text,
             response_format="wav",  # Request WAV for browser compatibility
         ) as response:
-            audio_bytes = response.read()
+            audio_bytes = await response.read()
 
         timed_print(f"  [TTS] OpenAI done: {len(audio_bytes)} bytes")
         return audio_bytes
 
-    def synthesize(
+    async def synthesize(
         self,
         text: str,
         voice: str = dynamic_config.tts_default_voice,
@@ -337,7 +338,7 @@ class TTSService:
         if settings.tts_provider == "openai":
             logger.info("[TTS] Provider set to OpenAI, using cloud API")
             try:
-                audio = self.synthesize_openai(text, voice=voice)
+                audio = await self.synthesize_openai(text, voice=voice)
                 logger.info("[TTS] OpenAI TTS succeeded")
                 return audio
             except Exception as e:
@@ -348,7 +349,10 @@ class TTSService:
         if is_kokoro_available():
             logger.info("[TTS] Attempting Kokoro (local)...")
             try:
-                audio = self.synthesize_kokoro(text, voice=voice, speed=speed)
+                # Kokoro is CPU-bound, run in thread to not block event loop
+                audio = await asyncio.to_thread(
+                    self.synthesize_kokoro, text, voice, speed
+                )
                 logger.info("[TTS] Kokoro succeeded")
                 return audio
             except Exception as e:
@@ -359,7 +363,7 @@ class TTSService:
         # 2. Fall back to OpenAI TTS
         logger.info("[TTS] Attempting OpenAI TTS (cloud)...")
         try:
-            audio = self.synthesize_openai(text, voice=voice)
+            audio = await self.synthesize_openai(text, voice=voice)
             logger.info("[TTS] OpenAI TTS succeeded")
             return audio
         except Exception as e:
