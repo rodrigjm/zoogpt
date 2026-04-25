@@ -253,6 +253,37 @@ class DynamicConfig:
         """Get current TTS speed."""
         return float(self._get_nested("tts", "speed", default=1.0))
 
+    # Pipeline stage accessors (hot-swap support)
+    @property
+    def pipeline_stt_provider(self) -> str | None:
+        """Get pipeline STT provider override. None = use settings default."""
+        return self._get_nested("pipeline", "stt", "provider", default=None)
+
+    @property
+    def pipeline_stt_model(self) -> str | None:
+        """Get pipeline STT model override."""
+        return self._get_nested("pipeline", "stt", "model", default=None)
+
+    @property
+    def pipeline_llm_provider(self) -> str | None:
+        """Get pipeline LLM provider override."""
+        return self._get_nested("pipeline", "llm", "provider", default=None)
+
+    @property
+    def pipeline_llm_model(self) -> str | None:
+        """Get pipeline LLM model override."""
+        return self._get_nested("pipeline", "llm", "model", default=None)
+
+    @property
+    def pipeline_tts_provider(self) -> str | None:
+        """Get pipeline TTS provider override."""
+        return self._get_nested("pipeline", "tts", "provider", default=None)
+
+    @property
+    def pipeline_tts_model(self) -> str | None:
+        """Get pipeline TTS model override."""
+        return self._get_nested("pipeline", "tts", "model", default=None)
+
 
 # Global dynamic config instance
 dynamic_config = DynamicConfig()
