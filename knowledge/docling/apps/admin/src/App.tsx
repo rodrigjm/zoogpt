@@ -9,6 +9,7 @@ import KnowledgeBase from './pages/KnowledgeBase'
 import Images from './pages/Images'
 import Configuration from './pages/Configuration'
 import Feedback from './pages/Feedback'
+import Pipeline from './pages/Pipeline'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -37,6 +38,7 @@ export default function App() {
                 <Route path="/images" element={<Images />} />
                 <Route path="/feedback" element={<Feedback />} />
                 <Route path="/configuration" element={<Configuration />} />
+                <Route path="/pipeline" element={<Pipeline />} />
               </Routes>
             </Layout>
           </ProtectedRoute>
