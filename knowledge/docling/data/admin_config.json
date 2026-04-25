@@ -1,0 +1,84 @@
+{
+  "version": "1.0",
+  "prompts": {
+    "system_prompt": "You are Zoocari, the friendly animal expert at Leesburg Animal Park. You help kids ages 6-12 learn about animals.\n\nSTYLE: Warm and fun but concise. Use simple words. No emojis. No filler. Answer the question directly, then stop.\n\nRULES:\n1. ONLY use facts from the CONTEXT below. Never guess or make up facts.\n2. If the context doesn't cover the question, say: \"Hmm, I don't know about that yet! Ask a zookeeper when you visit Leesburg Animal Park!\"\n3. Keep answers to 2-4 sentences (under 80 words). Answer exactly what was asked — no tangents.\n4. Handle nature gently (no graphic details).\n5. PARK ANIMALS: Only mention visiting an animal at the park if [PARK INFO: ...] appears in context. If no [PARK INFO] tag, the animal is NOT at our park — answer the question but never suggest visiting it here.\n6. When [PARK INFO: ...] is present, mention animal names and where to find them.\n\nFORMAT:\n- Answer the question directly (2-4 sentences)\n- Then end with exactly 3 follow-up questions:\n\n**Want to explore more? Here are some fun questions to ask me:**\n1. [Question]\n2. [Question]\n3. [Question]\n\nCONTEXT:\n{context}",
+    "fallback_response": "Hmm, I don't know about that yet! Maybe ask one of the zookeepers when you visit Leesburg Animal Park, or check out a book from your library!",
+    "followup_questions": [
+      "What do lions like to eat?",
+      "How fast can a cheetah run?",
+      "Why do zebras have stripes?"
+    ]
+  },
+  "model": {
+    "name": "gpt-4o-mini",
+    "temperature": 0.6,
+    "max_tokens": 250
+  },
+  "tts": {
+    "provider": "kokoro",
+    "default_voice": "af_heart",
+    "speed": 1.2,
+    "fallback_provider": "openai",
+    "available_voices": {
+      "kokoro": [
+        {
+          "id": "af_bella",
+          "name": "Bella",
+          "description": "Friendly female, clear pronunciation"
+        },
+        {
+          "id": "af_heart",
+          "name": "Heart",
+          "description": "Expressive, upbeat female"
+        },
+        {
+          "id": "af_nova",
+          "name": "Nova",
+          "description": "Warm, engaging female"
+        },
+        {
+          "id": "af_sarah",
+          "name": "Sarah",
+          "description": "Calm, gentle female"
+        },
+        {
+          "id": "am_adam",
+          "name": "Adam",
+          "description": "Clear male voice"
+        },
+        {
+          "id": "am_eric",
+          "name": "Eric",
+          "description": "Friendly male"
+        }
+      ],
+      "openai": [
+        {
+          "id": "nova",
+          "name": "Nova",
+          "description": "Warm female"
+        },
+        {
+          "id": "shimmer",
+          "name": "Shimmer",
+          "description": "Upbeat female"
+        },
+        {
+          "id": "alloy",
+          "name": "Alloy",
+          "description": "Neutral"
+        },
+        {
+          "id": "echo",
+          "name": "Echo",
+          "description": "Male voice"
+        },
+        {
+          "id": "onyx",
+          "name": "Onyx",
+          "description": "Deep male"
+        }
+      ]
+    }
+  }
+}
