@@ -204,3 +204,73 @@ export interface FeedbackItem {
   reviewed: boolean
   created_at: string
 }
+
+// Pipeline Types
+export interface PipelineStageConfig {
+  provider: string
+  model: string | null
+}
+
+export interface PipelineConfig {
+  stt: PipelineStageConfig
+  llm: PipelineStageConfig
+  tts: PipelineStageConfig
+}
+
+export interface PipelineStageUpdate {
+  provider: string
+  model?: string | null
+}
+
+export interface BenchmarkRequest {
+  concurrency: number
+  rounds: number
+}
+
+export interface BenchmarkMetrics {
+  p50_ms: number
+  p95_ms: number
+  p99_ms: number
+  avg_ms: number
+  min_ms: number
+  max_ms: number
+  success_rate: number
+}
+
+export interface CostBreakdown {
+  input_tokens_avg: number | null
+  output_tokens_avg: number | null
+  characters_avg: number | null
+  audio_seconds_avg: number | null
+}
+
+export interface BenchmarkResult {
+  id: string
+  stage: string
+  provider: string
+  model: string | null
+  timestamp: string
+  concurrency: number
+  rounds: number
+  total_requests: number
+  metrics: BenchmarkMetrics
+  cost_per_request: number
+  cost_breakdown: CostBreakdown
+}
+
+export interface BenchmarkStatus {
+  stage: string
+  running: boolean
+  progress: string | null
+  completed_requests: number
+  total_requests: number
+  result: BenchmarkResult | null
+}
+
+export interface ModelOption {
+  id: string
+  name: string
+  description: string
+}
+
+export type AvailableModels = Record<string, Record<string, ModelOption[]>>

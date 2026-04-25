@@ -208,3 +208,33 @@ export const feedbackApi = {
   markReviewed: (id: number) =>
     api<import('../types').FeedbackItem>(`/feedback/${id}/reviewed`, { method: 'PATCH' }),
 }
+
+// Pipeline API
+export const pipelineApi = {
+  getConfig: () =>
+    api<import('../types').PipelineConfig>('/pipeline'),
+
+  updateStage: (stage: string, data: import('../types').PipelineStageUpdate) =>
+    api<import('../types').PipelineStageConfig>(`/pipeline/${stage}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  getAvailableModels: () =>
+    api<import('../types').AvailableModels>('/pipeline/models'),
+
+  startBenchmark: (stage: string, data: import('../types').BenchmarkRequest) =>
+    api<import('../types').BenchmarkStatus>(`/pipeline/${stage}/benchmark`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getBenchmarkStatus: (stage: string) =>
+    api<import('../types').BenchmarkStatus>(`/pipeline/${stage}/benchmark/status`),
+
+  getLatestBenchmark: (stage: string) =>
+    api<import('../types').BenchmarkResult | null>(`/pipeline/${stage}/benchmark/latest`),
+
+  getBenchmarkHistory: (stage: string) =>
+    api<import('../types').BenchmarkResult[]>(`/pipeline/${stage}/benchmark/history`),
+}
