@@ -30,6 +30,31 @@
 
 ## Active Features (In Progress)
 
+### ✅ Pipeline Management Dashboard
+- **Directory:** `docs/superpowers/plans/2026-04-25-pipeline-management.md`
+- **Branch:** `feature/pipeline-management`
+- **Status:** Implemented — All 14 tasks complete, 28/28 new tests passing, frontend builds clean
+- **Owner:** Main Agent + subagent-driven-development
+- **Started:** 2026-04-25
+- **Completed:** 2026-04-25
+
+| Task | Status | Notes |
+|------|--------|-------|
+| 1. DynamicConfig pipeline accessors | ✅ Done | 6 properties + 8 tests, hot-reload supported |
+| 2. Wire LLM/STT/TTS to dynamic_config | ✅ Done | TTS voice priority bug caught + fixed in review |
+| 3. Pydantic models | ✅ Done | 8 models + AVAILABLE_MODELS catalog |
+| 4. Benchmark service | ✅ Done | Percentile calc + cost calc + result store, 9 tests |
+| 5. Admin-API pipeline router | ✅ Done | 7 endpoints under `/api/admin/pipeline` |
+| 6. Internal benchmark endpoints | ✅ Done | `/internal/benchmark/{stt,llm,tts}` on main API |
+| 7. Frontend TS types | ✅ Done | 9 interfaces in types/index.ts |
+| 8. Frontend API client | ✅ Done | `pipelineApi` with 7 methods |
+| 9. StageCard component | ✅ Done | Provider/model dropdown + benchmark controls |
+| 10. CostProjection component | ✅ Done | Monthly cost table at 4 daily volumes |
+| 11. Pipeline page + routing | ✅ Done | New `/pipeline` route + sidebar nav entry |
+| 12. Integration smoke tests | ✅ Done | 9 tests for router endpoints |
+| 13. Frontend build verification | ✅ Done | `tsc && vite build` clean |
+| 14. Final test run | ✅ Done | 28/28 new tests pass; 11 pre-existing async-helper failures unrelated |
+
 ### 🔄 Concurrency Optimization
 - **Directory:** `docs/active/concurrency-optimization/`
 - **Status:** Deployed & Benchmarked — Pending Production Verification
