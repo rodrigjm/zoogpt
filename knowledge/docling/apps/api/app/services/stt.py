@@ -14,7 +14,7 @@ from typing import Optional
 
 from openai import AsyncOpenAI
 
-from ..config import settings
+from ..config import settings, dynamic_config
 from ..utils.timing import timed_print
 
 logger = logging.getLogger(__name__)
@@ -207,10 +207,11 @@ class STTService:
         Raises:
             Exception: If all transcription methods fail
         """
-        logger.info(f"[STT] Starting transcription for {len(audio_bytes)} bytes (provider: {settings.stt_provider})")
+        provider = dynamic_config.pipeline_stt_provider or settings.stt_provider
+        logger.info(f"[STT] Starting transcription for {len(audio_bytes)} bytes (provider: {provider})")
 
         # If provider is explicitly set to openai, skip local
-        if settings.stt_provider == "openai":
+        if provider == "openai":
             logger.info("[STT] Provider set to OpenAI, using cloud API")
             try:
                 text = await self.transcribe_openai(audio_bytes)

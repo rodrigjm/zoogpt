@@ -6,7 +6,7 @@ import logging
 import httpx
 from typing import Optional
 from openai import AsyncOpenAI
-from ..config import settings
+from ..config import settings, dynamic_config
 from ..utils.timing import timed_print
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,6 @@ class LLMService:
     def __init__(self, openai_api_key: str):
         self.openai_client = AsyncOpenAI(api_key=openai_api_key)
         self.ollama_url = settings.ollama_url
-        self.ollama_model = settings.ollama_model
 
     async def generate_ollama(
         self,
@@ -60,13 +59,14 @@ class LLMService:
         max_tokens: int = 500
     ) -> str:
         """Generate using local Ollama."""
-        timed_print(f"  [LLM] Ollama generating ({self.ollama_model})...")
+        model = dynamic_config.pipeline_llm_model or settings.ollama_model
+        timed_print(f"  [LLM] Ollama generating ({model})...")
 
         client = _get_async_httpx_client()
         response = await client.post(
             f"{self.ollama_url}/api/chat",
             json={
-                "model": self.ollama_model,
+                "model": model,
                 "messages": messages,
                 "stream": False,
                 "options": {
@@ -108,12 +108,15 @@ class LLMService:
         max_tokens: int = 500
     ) -> str:
         """Generate with local-first, cloud fallback."""
-        # Try Ollama first if available
-        if settings.llm_provider == "ollama" and await is_ollama_available():
+        provider = dynamic_config.pipeline_llm_provider or settings.llm_provider
+
+        # Try Ollama first if configured
+        if provider == "ollama" and await is_ollama_available():
             try:
                 return await self.generate_ollama(messages, temperature, max_tokens)
             except Exception as e:
                 logger.warning(f"Ollama failed, falling back to OpenAI: {e}")
 
-        # Fallback to OpenAI
-        return await self.generate_openai(messages, model, temperature, max_tokens)
+        # Use OpenAI (either as primary or fallback)
+        openai_model = dynamic_config.pipeline_llm_model or model
+        return await self.generate_openai(messages, openai_model, temperature, max_tokens)
