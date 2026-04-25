@@ -8,6 +8,7 @@ and per-stage benchmark execution.
 import asyncio
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -70,25 +71,61 @@ def _save_config(config: dict):
 # Model Selection
 # =============================================================================
 
+def _effective_provider(stage: str) -> str:
+    """Provider currently used by the running services (env-var driven)."""
+    env_key = {"stt": "STT_PROVIDER", "llm": "LLM_PROVIDER", "tts": "TTS_PROVIDER"}[stage]
+    fallback = {"stt": "faster-whisper", "llm": "ollama", "tts": "kokoro"}[stage]
+    return os.environ.get(env_key, fallback)
+
+
+def _effective_model(stage: str, provider: str, saved_config: dict) -> str:
+    """Model currently used. Honors saved config first, then env, then catalog default."""
+    # If admin previously saved a non-pipeline config (e.g. model.name for LLM, tts.default_voice
+    # for TTS), reflect that here so the dropdown matches what's actually running.
+    if stage == "llm":
+        env_default = os.environ.get("OPENAI_MODEL") if provider == "openai" else os.environ.get("OLLAMA_MODEL")
+        return env_default or saved_config.get("model", {}).get("name") or (
+            "gpt-4o-mini" if provider == "openai" else "qwen2.5:3b"
+        )
+    if stage == "tts":
+        # OpenAI TTS uses model names (tts-1), Kokoro uses voice IDs
+        if provider == "openai":
+            return "tts-1"
+        if provider == "elevenlabs":
+            return "default"
+        # Kokoro: use saved voice
+        return os.environ.get("TTS_VOICE") or saved_config.get("tts", {}).get("default_voice") or "af_heart"
+    # stt has no model name in legacy config; just pick catalog default
+    return "whisper-1" if provider == "openai" else "base"
+
+
 @router.get("", response_model=PipelineConfig)
 async def get_pipeline_config(user: User = Depends(get_current_user)):
-    """Get current pipeline configuration for all stages."""
+    """Get current pipeline configuration for all stages.
+
+    When the admin_config.json doesn't yet have a `pipeline` key, return the
+    *effective* runtime configuration derived from env vars and legacy config
+    sections — so the UI reflects what's actually running, not invented defaults.
+    """
     config = _load_config()
     pipeline = config.get("pipeline", {})
 
+    def stage_config(stage: str) -> PipelineStageConfig:
+        saved = pipeline.get(stage, {})
+        if "provider" in saved:
+            provider = saved["provider"]
+            model = saved.get("model")
+            if model is None:
+                model = _effective_model(stage, provider, config)
+        else:
+            provider = _effective_provider(stage)
+            model = _effective_model(stage, provider, config)
+        return PipelineStageConfig(provider=provider, model=model)
+
     return PipelineConfig(
-        stt=PipelineStageConfig(
-            provider=pipeline.get("stt", {}).get("provider", "faster-whisper"),
-            model=pipeline.get("stt", {}).get("model", "base"),
-        ),
-        llm=PipelineStageConfig(
-            provider=pipeline.get("llm", {}).get("provider", "ollama"),
-            model=pipeline.get("llm", {}).get("model", "qwen2.5:3b"),
-        ),
-        tts=PipelineStageConfig(
-            provider=pipeline.get("tts", {}).get("provider", "kokoro"),
-            model=pipeline.get("tts", {}).get("model", "af_heart"),
-        ),
+        stt=stage_config("stt"),
+        llm=stage_config("llm"),
+        tts=stage_config("tts"),
     )
 
 

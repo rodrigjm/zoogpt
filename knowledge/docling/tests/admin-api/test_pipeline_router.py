@@ -136,3 +136,20 @@ def test_benchmark_history_empty(client):
     response = client.get("/api/admin/pipeline/tts/benchmark/history")
     assert response.status_code == 200
     assert response.json() == []
+
+
+def test_get_pipeline_reflects_env_when_pipeline_key_missing(client, monkeypatch):
+    """When no pipeline key is saved, GET should reflect the actual env-driven runtime config."""
+    monkeypatch.setenv("STT_PROVIDER", "openai")
+    monkeypatch.setenv("LLM_PROVIDER", "openai")
+    monkeypatch.setenv("TTS_PROVIDER", "openai")
+
+    response = client.get("/api/admin/pipeline")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["stt"]["provider"] == "openai"
+    assert data["stt"]["model"] == "whisper-1"
+    assert data["llm"]["provider"] == "openai"
+    assert data["llm"]["model"] == "gpt-4o-mini"
+    assert data["tts"]["provider"] == "openai"
+    assert data["tts"]["model"] == "tts-1"
