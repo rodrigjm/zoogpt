@@ -115,7 +115,7 @@ def estimate_cost(results: list[StepTiming]) -> dict:
 
 
 async def run_single_e2e(session: aiohttp.ClientSession, question: str) -> StepTiming:
-    """Run one full end-to-end request: session → chat/stream → tts → audio."""
+    """Run one pipelined request: session → /tts/stream (RAG+LLM+TTS combined)."""
     timing = StepTiming()
     e2e_start = time.perf_counter()
 
@@ -133,72 +133,88 @@ async def run_single_e2e(session: aiohttp.ClientSession, question: str) -> StepT
             session_id = data["session_id"]
         timing.session_ms = (time.perf_counter() - t0) * 1000
 
-        # ── Step 2: Chat Stream (RAG + LLM) ────────────────────────
+        # ── Step 2+3: Pipelined /tts/stream (RAG + LLM + TTS) ─────
         t0 = time.perf_counter()
-        first_token_received = False
+        first_text_received = False
+        first_audio_received = False
         full_reply = []
+        audio_size = 0
+        current_event = None
 
         async with session.post(
-            f"{BASE_URL}/api/chat/stream",
-            json={"session_id": session_id, "message": question},
+            f"{BASE_URL}/api/voice/tts/stream",
+            json={"session_id": session_id, "message": question, "voice": "af_heart"},
         ) as resp:
             if resp.status != 200:
-                timing.error = f"Chat failed: {resp.status} {await resp.text()}"
+                timing.error = f"Pipeline failed: {resp.status} {await resp.text()}"
                 return timing
 
-            async for line in resp.content:
-                decoded = line.decode("utf-8").strip()
-                if not decoded:
-                    continue
+            # Read raw bytes in chunks to handle large base64 audio lines
+            raw_buffer = b""
+            async for raw_chunk in resp.content.iter_any():
+                raw_buffer += raw_chunk
 
-                # Handle SSE format: "data: {...}"
-                if decoded.startswith("data: "):
-                    decoded = decoded[6:]
-                elif decoded.startswith("event:"):
-                    continue
+                # Split on double newline (SSE event boundary, handles \r\n\r\n and \n\n)
+                while b"\r\n\r\n" in raw_buffer or b"\n\n" in raw_buffer:
+                    # Find the earliest separator
+                    crlf_pos = raw_buffer.find(b"\r\n\r\n")
+                    lf_pos = raw_buffer.find(b"\n\n")
+                    if crlf_pos >= 0 and (lf_pos < 0 or crlf_pos <= lf_pos):
+                        event_block = raw_buffer[:crlf_pos]
+                        raw_buffer = raw_buffer[crlf_pos + 4:]
+                    else:
+                        event_block = raw_buffer[:lf_pos]
+                        raw_buffer = raw_buffer[lf_pos + 2:]
+                    lines = event_block.decode("utf-8", errors="replace").replace("\r\n", "\n").split("\n")
 
-                try:
-                    chunk = json.loads(decoded)
-                except json.JSONDecodeError:
-                    continue
+                    data_str = None
+                    for line in lines:
+                        if line.startswith("event: "):
+                            current_event = line[7:].strip()
+                        elif line.startswith("data: "):
+                            data_str = line[6:]
 
-                if chunk.get("type") == "text":
-                    if not first_token_received:
-                        timing.chat_first_token_ms = (time.perf_counter() - t0) * 1000
-                        first_token_received = True
-                    full_reply.append(chunk.get("content", ""))
-                elif chunk.get("type") == "done":
-                    break
-                elif chunk.get("type") == "error":
-                    timing.error = f"Chat stream error: {chunk.get('content')}"
-                    return timing
+                    if data_str is None:
+                        continue
 
-        timing.chat_total_ms = (time.perf_counter() - t0) * 1000
+                    try:
+                        chunk = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
+
+                    if current_event == "text" or ("content" in chunk and "chunk" not in chunk):
+                        if not first_text_received:
+                            timing.chat_first_token_ms = (time.perf_counter() - t0) * 1000
+                            first_text_received = True
+                        full_reply.append(chunk.get("content", ""))
+
+                    elif current_event == "audio" or ("chunk" in chunk and "sentence" in chunk):
+                        if not first_audio_received:
+                            timing.tts_first_chunk_ms = (time.perf_counter() - t0) * 1000
+                            first_audio_received = True
+                        audio_b64 = chunk.get("chunk", "")
+                        if audio_b64:
+                            try:
+                                audio_size += len(base64.b64decode(audio_b64))
+                            except Exception:
+                                audio_size += len(audio_b64)
+
+                    elif current_event == "done" or "total_sentences" in chunk:
+                        break
+
+                    elif current_event == "error" or "code" in chunk:
+                        timing.error = f"Pipeline error: {chunk.get('message', chunk)}"
+                        return timing
+
+                    current_event = None
+
+        pipeline_total = (time.perf_counter() - t0) * 1000
+        timing.chat_total_ms = pipeline_total  # Combined metric
+        timing.tts_total_ms = pipeline_total
         timing.reply_text = "".join(full_reply)
         timing.reply_chars = len(timing.reply_text)
         timing.reply_tokens_est = timing.reply_chars // CHARS_PER_TOKEN
-        # Rough input estimate: system prompt (~500 tokens) + RAG context (~800 tokens) + question
         timing.input_tokens_est = 500 + 800 + (len(question) // CHARS_PER_TOKEN)
-
-        if not timing.reply_text:
-            timing.error = "Empty chat reply"
-            return timing
-
-        # ── Step 3: TTS (sync endpoint for accurate timing) ─────────
-        t0 = time.perf_counter()
-        audio_size = 0
-
-        async with session.post(
-            f"{BASE_URL}/api/voice/tts",
-            json={"session_id": session_id, "text": timing.reply_text},
-        ) as tts_resp:
-            if tts_resp.status == 200:
-                audio_data = await tts_resp.read()
-                audio_size = len(audio_data)
-                timing.tts_first_chunk_ms = (time.perf_counter() - t0) * 1000
-            else:
-                timing.error = f"TTS failed: {tts_resp.status}"
-                return timing
 
         timing.tts_total_ms = (time.perf_counter() - t0) * 1000
         timing.tts_audio_bytes = audio_size
