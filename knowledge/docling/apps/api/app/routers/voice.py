@@ -333,6 +333,12 @@ async def tts_stream(body: TTSStreamRequest):
                 buffer += chunk
                 full_response += chunk
 
+                # Stream text chunks to frontend for live display
+                yield {
+                    "event": "text",
+                    "data": json.dumps({"content": chunk})
+                }
+
                 # Check if we've hit the follow-up questions section
                 if "Want to explore more?" in buffer:
                     skip_tts = True
@@ -402,6 +408,9 @@ async def tts_stream(body: TTSStreamRequest):
             # Record TTS timing
             timer.component_timings["tts"] = tts_total_ms
 
+            # Extract follow-up questions from full response
+            _, followup_questions = _rag_service.extract_followup_questions(full_response)
+
             # Send completion event
             total_ms = timer.end(f"SUCCESS - {sentence_index} sentences")
 
@@ -424,7 +433,8 @@ async def tts_stream(body: TTSStreamRequest):
                 "event": "done",
                 "data": json.dumps({
                     "total_sentences": sentence_index,
-                    "sources": sources
+                    "sources": sources,
+                    "followup_questions": followup_questions,
                 })
             }
 

@@ -257,7 +257,8 @@ export async function streamTextToSpeech(
   request: TtsStreamRequest,
   onAudioChunk: (chunk: TtsStreamAudioChunk) => void,
   onComplete?: (data: TtsStreamDoneData) => void,
-  onError?: (error: Error) => void
+  onError?: (error: Error) => void,
+  onTextChunk?: (content: string) => void,
 ): Promise<void> {
   try {
     const response = await fetch(`${API_BASE}/voice/tts/stream`, {
@@ -314,7 +315,12 @@ export async function streamTextToSpeech(
             const parsed = JSON.parse(data);
 
             // Check what type of event this is based on content
-            if ('chunk' in parsed && 'sentence' in parsed) {
+            if ('content' in parsed && !('chunk' in parsed)) {
+              // Text chunk event (LLM streaming token)
+              if (onTextChunk) {
+                onTextChunk(parsed.content);
+              }
+            } else if ('chunk' in parsed && 'sentence' in parsed) {
               // Audio chunk event
               onAudioChunk(parsed as TtsStreamAudioChunk);
             } else if ('total_sentences' in parsed) {

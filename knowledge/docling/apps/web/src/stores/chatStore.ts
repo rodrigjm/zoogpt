@@ -4,8 +4,8 @@
  */
 
 import { create } from 'zustand';
-import type { ChatMessage, Source, StreamChunk } from '../types';
-import { sendChatMessage, streamChatMessage } from '../lib/api';
+import type { ChatMessage, Source, StreamChunk, TtsStreamAudioChunk, TtsStreamDoneData } from '../types';
+import { sendChatMessage, streamChatMessage, streamTextToSpeech } from '../lib/api';
 
 /**
  * Strip follow-up questions section from response text.
@@ -47,6 +47,12 @@ interface ChatState {
   // Actions
   sendMessage: (sessionId: string, content: string) => Promise<void>;
   sendMessageStream: (sessionId: string, content: string) => Promise<void>;
+  sendMessagePipelined: (
+    sessionId: string,
+    content: string,
+    onAudioChunk: (chunk: TtsStreamAudioChunk) => void,
+    onAudioDone: () => void,
+  ) => Promise<void>;
   addMessage: (message: ChatMessage) => void;
   addImageMessage: (sessionId: string, imageUrls: string[], animalName: string) => void;
   clearMessages: () => void;
@@ -182,6 +188,88 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       );
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Stream failed';
+      set({
+        error: errorMsg,
+        isStreaming: false,
+        streamingContent: '',
+      });
+    }
+  },
+
+  // Send message with pipelined LLM→TTS (single /tts/stream call)
+  // Streams text for chat display AND audio chunks simultaneously
+  sendMessagePipelined: async (
+    sessionId: string,
+    content: string,
+    onAudioChunk: (chunk: TtsStreamAudioChunk) => void,
+    onAudioDone: () => void,
+  ) => {
+    const userMessage: ChatMessage = {
+      message_id: `user-${Date.now()}`,
+      session_id: sessionId,
+      role: 'user',
+      content,
+      created_at: new Date().toISOString(),
+    };
+
+    set((state) => ({
+      messages: [...state.messages, userMessage],
+      isStreaming: true,
+      streamingContent: '',
+      error: null,
+      sources: [],
+      followupQuestions: [],
+      confidence: null,
+    }));
+
+    let streamedText = '';
+
+    try {
+      await streamTextToSpeech(
+        {
+          session_id: sessionId,
+          message: content,
+          voice: 'af_heart',
+        },
+        // onAudioChunk — forward to caller for playback
+        onAudioChunk,
+        // onComplete
+        (data: TtsStreamDoneData) => {
+          const assistantMessage: ChatMessage = {
+            message_id: `assistant-${Date.now()}`,
+            session_id: sessionId,
+            role: 'assistant',
+            content: stripFollowupQuestions(streamedText),
+            created_at: new Date().toISOString(),
+            sources: data.sources || [],
+          };
+
+          set((state) => ({
+            messages: [...state.messages, assistantMessage],
+            sources: data.sources || [],
+            followupQuestions: data.followup_questions || [],
+            isStreaming: false,
+            streamingContent: '',
+          }));
+
+          onAudioDone();
+        },
+        // onError
+        (error: Error) => {
+          set({
+            error: error.message,
+            isStreaming: false,
+            streamingContent: '',
+          });
+        },
+        // onTextChunk — update streaming text display
+        (textContent: string) => {
+          streamedText += textContent;
+          set({ streamingContent: stripFollowupQuestions(streamedText) });
+        },
+      );
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Pipeline failed';
       set({
         error: errorMsg,
         isStreaming: false,

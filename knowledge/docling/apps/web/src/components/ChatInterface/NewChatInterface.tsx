@@ -7,7 +7,8 @@ import React, { useEffect, useCallback, lazy, Suspense, useRef, useState } from 
 import { useSessionStore, useChatStore } from '../../stores';
 import { useUIStore } from '../../stores/uiStore';
 import { useVoiceStore } from '../../stores/voiceStore';
-import { textToSpeech, submitSurvey } from '../../lib/api';
+import { submitSurvey } from '../../lib/api';
+import type { TtsStreamAudioChunk } from '../../types';
 
 // New chat components
 import { ChatContainer, ChatHeader, ScrollToBottom } from '../chat';
@@ -40,7 +41,7 @@ export default function NewChatInterface() {
     sources,
     followupQuestions,
     error,
-    sendMessageStream,
+    sendMessagePipelined,
     setRating,
     getRating,
     addImageMessage,
@@ -57,29 +58,39 @@ export default function NewChatInterface() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Generate TTS for new assistant messages
-  useEffect(() => {
-    const lastMessage = messages[messages.length - 1];
-    if (
-      lastMessage &&
-      lastMessage.role === 'assistant' &&
-      sessionId &&
-      !isStreaming
-    ) {
-      textToSpeech({
-        session_id: sessionId,
-        text: lastMessage.content,
-        voice: 'af_heart',
-      })
-        .then((blob) => {
-          setAudioBlob(blob);
-          setIsAudioPlaying(true);
-        })
-        .catch((err) => {
-          console.error('TTS generation failed:', err);
-        });
+  // Audio queue for pipelined TTS playback
+  const audioQueueRef = useRef<Blob[]>([]);
+  const isPlayingRef = useRef(false);
+
+  const playNextChunk = useCallback(() => {
+    if (audioQueueRef.current.length === 0) {
+      isPlayingRef.current = false;
+      setIsAudioPlaying(false);
+      return;
     }
-  }, [messages, sessionId, isStreaming]);
+
+    isPlayingRef.current = true;
+    setIsAudioPlaying(true);
+    const blob = audioQueueRef.current.shift()!;
+    setAudioBlob(blob);
+  }, []);
+
+  const handleAudioChunk = useCallback((chunk: TtsStreamAudioChunk) => {
+    // Convert base64 to Blob
+    const binaryString = atob(chunk.chunk);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const blob = new Blob([bytes], { type: 'audio/wav' });
+
+    audioQueueRef.current.push(blob);
+
+    // Start playing if not already
+    if (!isPlayingRef.current) {
+      playNextChunk();
+    }
+  }, [playNextChunk]);
 
   // Track scroll position for jump-to-bottom button
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -96,24 +107,38 @@ export default function NewChatInterface() {
     });
   }, []);
 
+  // Send message with pipelined LLM→TTS
+  const sendPipelined = useCallback((text: string) => {
+    if (!sessionId || !text.trim()) return;
+    audioQueueRef.current = [];
+    isPlayingRef.current = false;
+    sendMessagePipelined(
+      sessionId,
+      text.trim(),
+      handleAudioChunk,
+      () => {
+        // onAudioDone — queue will finish naturally
+        if (!isPlayingRef.current && audioQueueRef.current.length === 0) {
+          setIsAudioPlaying(false);
+        }
+      },
+    );
+  }, [sessionId, sendMessagePipelined, handleAudioChunk]);
+
   // Handle text input send
   const handleTextSend = useCallback((text: string) => {
-    if (!sessionId || !text.trim()) return;
-    sendMessageStream(sessionId, text.trim());
-  }, [sessionId, sendMessageStream]);
+    sendPipelined(text);
+  }, [sendPipelined]);
 
   // Handle followup question click
   const handleFollowupClick = useCallback((question: string) => {
-    if (!sessionId) return;
-    sendMessageStream(sessionId, question);
-  }, [sessionId, sendMessageStream]);
+    sendPipelined(question);
+  }, [sendPipelined]);
 
   // Handle animal selection
   const handleAnimalSelect = useCallback((animal: string) => {
-    if (!sessionId) return;
-    const message = `Tell me about the ${animal}`;
-    sendMessageStream(sessionId, message);
-  }, [sessionId, sendMessageStream]);
+    sendPipelined(`Tell me about the ${animal}`);
+  }, [sendPipelined]);
 
   // Handle rating
   const handleRate = useCallback((messageId: string, rating: 'up' | 'down') => {
@@ -181,7 +206,7 @@ export default function NewChatInterface() {
             {audioBlob && (
               <div className="px-4 py-2">
                 <Suspense fallback={<div className="text-center text-text-muted text-sm">Loading audio...</div>}>
-                  <AudioPlayer audioBlob={audioBlob} autoPlay={true} onEnded={() => setIsAudioPlaying(false)} />
+                  <AudioPlayer audioBlob={audioBlob} autoPlay={true} onEnded={playNextChunk} />
                 </Suspense>
               </div>
             )}

@@ -122,6 +122,7 @@ export interface TtsStreamAudioChunk {
 export interface TtsStreamDoneData {
   total_sentences: number;
   sources?: Source[];
+  followup_questions?: string[];
 }
 
 // WebSocket TTS Types
