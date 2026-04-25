@@ -193,7 +193,7 @@ export default function NewChatInterface() {
         footer={
           <div className="flex flex-col">
             {/* Follow-up questions */}
-            {followupQuestions.length > 0 && !isStreaming && (
+            {followupQuestions.length > 0 && !isStreaming && !isAudioPlaying && (
               <div className="px-4 pt-2">
                 <FollowupChips
                   questions={followupQuestions}
