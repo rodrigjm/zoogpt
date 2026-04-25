@@ -137,12 +137,18 @@
 - [ ] local ollama hosted embedding model
 
 ### Q2 2026
+- [ ] **API Concurrency & Performance Optimization** — Load test (2026-04-25) showed E2E latency degrades from 11s (1 user) to 124s (20 users) due to request serialization. TTS is 97% of OpenAI cost ($0.0087/req). Five fixes ordered by priority:
+  - [ ] Add `--workers 4` to uvicorn CMD in Dockerfile (1-line fix, ~4x concurrency)
+  - [ ] Switch TTS provider back to Kokoro (local) — eliminates 97% of API cost
+  - [ ] Refactor TTS/LLM/STT services to use `AsyncOpenAI` client (~7 files)
+  - [ ] Wrap sync LanceDB search in `asyncio.to_thread()` (~1 file)
+  - [ ] Parallelize TTS sentence synthesis in `/tts/stream` endpoint (~1 file)
 - [ ] Mobile app companion
 - [ ] Offline mode support
 
 ### Backlog
 - [ ] **Multi-Lingual Support (English/Spanish)** - Planning complete, design doc at `docs/active/multilingual-support/design.md`. 6-phase implementation: API contracts → Voice/RAG/Frontend (parallel) → KB/Safety → QA → Deploy. ~35-45 files affected.
-- [ ] **Admin Portal Ollama Parameters** - Add Ollama-specific model params (top_p, top_k, repeat_penalty, etc.) to admin config panel. Requires updates across ModelConfig (Python + TypeScript), admin UI, and LLM/RAG services. ~7 files.
+- [ ] **Admin Portal Model Selection Panel** - Admin UI to select provider + model for each inference step: Embedding (OpenAI `text-embedding-3-large` / local), LLM Generation (OpenAI `gpt-4o-mini` / Ollama `phi4`), STT (OpenAI Whisper / Faster-Whisper local), TTS (OpenAI TTS / Kokoro local). Should persist to env/config, show active provider status, and expose provider-specific params (Ollama: top_p, top_k, repeat_penalty; OpenAI: temperature, max_tokens). Subsumes the old "Admin Portal Ollama Parameters" backlog item. Requires: new admin API endpoints, ModelConfig schema expansion (Python + TypeScript), admin UI panel, and service restart/reload logic. ~15-20 files.
 - [ ] **Animal Image Gallery — Fix Image Sourcing** - Gallery components preserved in codebase (`AnimalImageGallery`, `AnimalImage`, `ImageLightbox`, `ImageSkeleton`), disabled in UI pending correct image sourcing for ~60/70 animals. Re-enable by uncommenting gallery block in `MessageBubble.tsx`.
 - [ ] **AI Feedback Synthesis & ClickUp Integration** - Use LLM/OpenAI to analyze customer feedback table, synthesize into actionable feature proposals with: reason, market fit, customer experience impact. Auto-post to ClickUp via MCP capabilities for product backlog management.
 - [ ] Voice personality customization
