@@ -90,8 +90,16 @@ export default function StageCard({
 
   const handleRunBenchmark = async () => {
     try {
+      // Apply the current dropdown selection first so the benchmark targets
+      // the config the admin actually picked (not whatever was last saved).
+      await pipelineApi.updateStage(stage, {
+        provider: selectedProvider,
+        model: selectedModel || null,
+      })
+      setApplyStatus('success')
       const status = await pipelineApi.startBenchmark(stage, { concurrency, rounds })
       setBenchmarkStatus(status)
+      onConfigChange()
       startPolling()
     } catch (err: any) {
       alert(err.message || 'Failed to start benchmark')
