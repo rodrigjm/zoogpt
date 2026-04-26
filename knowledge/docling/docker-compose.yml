@@ -198,6 +198,7 @@ services:
       - IMAGE_STORAGE_PATH=/app/images/animals
       - PARK_INVENTORY_PATH=/app/data/park_inventory.json
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ZOOCARI_API_URL=http://api:8000
     env_file:
       - path: .env
         required: false

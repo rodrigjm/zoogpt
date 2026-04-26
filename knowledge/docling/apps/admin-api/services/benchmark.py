@@ -160,11 +160,19 @@ async def run_benchmark(
     _running_benchmarks[stage] = {
         "stage": stage,
         "running": True,
-        "progress": f"0/{total_requests} requests",
+        "progress": "Waiting for config to apply...",
         "completed_requests": 0,
         "total_requests": total_requests,
         "result": None,
     }
+
+    # Main API's DynamicConfig polls admin_config.json every 5s. If the admin
+    # just updated the pipeline config (e.g. Run-with-auto-apply), the main API
+    # may still be using the previous provider/model for ~5s. Wait it out so the
+    # benchmark measures the actually-requested config.
+    await asyncio.sleep(6.0)
+
+    _running_benchmarks[stage]["progress"] = f"0/{total_requests} requests"
 
     latencies = []
     successes = 0
