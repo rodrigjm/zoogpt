@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { getSharedAudioElement, unlockAudio } from '../lib/audioUnlock';
 
 interface UseAudioPlayerState {
   isPlaying: boolean;
@@ -25,8 +26,8 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const detachListenersRef = useRef<(() => void) | null>(null);
 
-  // Clean up Object URL
   const revokeObjectUrl = useCallback(() => {
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
@@ -34,40 +35,42 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     }
   }, []);
 
-  // Play audio from Blob
+  const detachListeners = useCallback(() => {
+    if (detachListenersRef.current) {
+      detachListenersRef.current();
+      detachListenersRef.current = null;
+    }
+  }, []);
+
   const play = useCallback(async (audioBlob: Blob): Promise<void> => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Clean up previous audio
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-      }
+      // Best-effort: if a gesture is still active in this stack, this primes
+      // the shared element. No-op once already unlocked.
+      unlockAudio();
+
+      const audio = getSharedAudioElement();
+
+      detachListeners();
+      audio.pause();
+      audio.currentTime = 0;
       revokeObjectUrl();
 
-      // Create new Audio element and Object URL
-      const audio = new Audio();
       const objectUrl = URL.createObjectURL(audioBlob);
       objectUrlRef.current = objectUrl;
       audio.src = objectUrl;
 
-      // Set up event listeners
       const handleLoadedMetadata = () => {
         setDuration(audio.duration);
         setIsLoading(false);
       };
-
-      const handleTimeUpdate = () => {
-        setCurrentTime(audio.currentTime);
-      };
-
+      const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
       const handleEnded = () => {
         setIsPlaying(false);
         setCurrentTime(0);
       };
-
       const handleError = () => {
         const audioError = audio.error;
         const errorMsg = audioError
@@ -84,9 +87,15 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
       audio.addEventListener('ended', handleEnded);
       audio.addEventListener('error', handleError);
 
+      detachListenersRef.current = () => {
+        audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        audio.removeEventListener('timeupdate', handleTimeUpdate);
+        audio.removeEventListener('ended', handleEnded);
+        audio.removeEventListener('error', handleError);
+      };
+
       audioRef.current = audio;
 
-      // Load and play
       await audio.play();
       setIsPlaying(true);
     } catch (err) {
@@ -94,9 +103,8 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
       setIsPlaying(false);
       setIsLoading(false);
     }
-  }, [revokeObjectUrl]);
+  }, [revokeObjectUrl, detachListeners]);
 
-  // Pause playback
   const pause = useCallback(() => {
     if (audioRef.current && isPlaying) {
       audioRef.current.pause();
@@ -104,7 +112,6 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     }
   }, [isPlaying]);
 
-  // Stop and reset to beginning
   const stop = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -114,8 +121,8 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     }
   }, []);
 
-  // Reset all state (for when audio source changes)
   const reset = useCallback(() => {
+    detachListeners();
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current = null;
@@ -126,9 +133,8 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     setCurrentTime(0);
     setDuration(0);
     setError(null);
-  }, [revokeObjectUrl]);
+  }, [revokeObjectUrl, detachListeners]);
 
-  // Seek to specific time
   const seek = useCallback((time: number) => {
     if (audioRef.current) {
       audioRef.current.currentTime = Math.max(0, Math.min(time, duration));
@@ -136,16 +142,16 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     }
   }, [duration]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
+      detachListeners();
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
       revokeObjectUrl();
     };
-  }, [revokeObjectUrl]);
+  }, [revokeObjectUrl, detachListeners]);
 
   return {
     isPlaying,

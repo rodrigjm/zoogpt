@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAudioPlayer } from './useAudioPlayer';
+import { __resetAudioUnlockForTests } from '../lib/audioUnlock';
 
 describe('useAudioPlayer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    __resetAudioUnlockForTests();
   });
 
   describe('Task 3.3 Acceptance Criteria', () => {
