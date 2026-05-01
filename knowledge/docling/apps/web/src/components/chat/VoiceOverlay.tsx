@@ -2,36 +2,33 @@ import React from 'react';
 import { useVoiceStore } from '../../stores/voiceStore';
 
 interface VoiceOverlayProps {
+  onStop: () => void;
   onCancel: () => void;
 }
 
-export default function VoiceOverlay({ onCancel }: VoiceOverlayProps) {
+export default function VoiceOverlay({ onStop, onCancel }: VoiceOverlayProps) {
   const mode = useVoiceStore((state) => state.mode);
 
   const isRecording = mode === 'recording';
   const isProcessing = mode === 'processing';
 
-  const getStatusText = () => {
-    if (isRecording) return 'Listening...';
-    if (isProcessing) return 'Processing...';
-    return 'Ready';
-  };
+  const stopAriaLabel = isProcessing ? 'Processing audio' : 'Stop recording';
+  const stopLabel = isProcessing ? 'Sending…' : 'Tap to Stop';
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm"
-      onClick={onCancel}
-    >
-      <div
-        className="flex flex-col items-center gap-8"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Large mic button */}
-        <div
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="flex flex-col items-center gap-8">
+        {/* Big interactive stop button (replaces the previously decorative mic) */}
+        <button
+          type="button"
+          onClick={onStop}
+          disabled={isProcessing}
+          aria-label={stopAriaLabel}
           className={`
             relative w-32 h-32 rounded-full flex items-center justify-center
             ${isRecording ? 'bg-voice-recording animate-pulse-ring' : 'bg-voice-processing'}
-            shadow-2xl
+            shadow-2xl active:scale-95 transition-transform duration-150
+            disabled:cursor-not-allowed
           `}
         >
           {isProcessing ? (
@@ -39,6 +36,7 @@ export default function VoiceOverlay({ onCancel }: VoiceOverlayProps) {
               className="w-16 h-16 text-white animate-spin"
               fill="none"
               viewBox="0 0 24 24"
+              aria-hidden="true"
             >
               <circle
                 className="opacity-25"
@@ -55,35 +53,26 @@ export default function VoiceOverlay({ onCancel }: VoiceOverlayProps) {
               />
             </svg>
           ) : (
-            <svg
-              className="w-16 h-16 text-white"
-              fill="currentColor"
-              viewBox="0 0 20 20"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                fillRule="evenodd"
-                d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"
-                clipRule="evenodd"
-              />
-            </svg>
+            // Stop-square glyph
+            <span className="block w-12 h-12 rounded-md bg-white" aria-hidden="true" />
           )}
-        </div>
+        </button>
 
-        {/* Status text */}
+        {/* Status / instruction text */}
         <p className="text-2xl font-heading font-semibold text-white drop-shadow-lg">
-          {getStatusText()}
+          {stopLabel}
         </p>
 
-        {/* Cancel button */}
+        {/* Secondary cancel pill */}
         <button
           onClick={onCancel}
+          disabled={isProcessing}
           className="
             px-8 py-3 rounded-full
             bg-white/20 hover:bg-white/30
             text-white font-body font-medium
             backdrop-blur-sm transition-all duration-200
-            active:scale-95
+            active:scale-95 disabled:opacity-50
           "
           type="button"
         >
