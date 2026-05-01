@@ -158,11 +158,41 @@ export default function NewChatInterface() {
     }
   }, [sessionId, messages, addImageMessage]);
 
+  // Handle voice overlay stop — flush recording, transcribe, then send through pipelined TTS.
+  // Used by the overlay's Stop button AND by the 20s auto-stop timer.
+  const handleVoiceStop = useCallback(async () => {
+    if (!sessionId) return;
+    const store = useVoiceStore.getState();
+    if (store.mode !== 'recording') return; // already stopped or never started
+    try {
+      const blob = await store.stopRecording();
+      if (!blob) return;
+      const text = await store.transcribe(sessionId, blob);
+      if (text && text.trim()) {
+        sendPipelined(text.trim());
+      }
+    } catch (err) {
+      console.error('Voice stop/transcribe failed:', err);
+      useVoiceStore.getState().reset();
+    }
+  }, [sessionId, sendPipelined]);
+
   // Handle voice overlay cancel
   const handleVoiceCancel = useCallback(() => {
     // Voice store will handle the state reset
     useVoiceStore.getState().reset();
   }, []);
+
+  // Safety net: auto-stop and submit any recording that runs longer than 20s
+  // (kids' answers are short; this prevents stuck recordings on mobile).
+  useEffect(() => {
+    if (voiceMode !== 'recording') return;
+    const MAX_RECORDING_MS = 20_000;
+    const timer = setTimeout(() => {
+      handleVoiceStop();
+    }, MAX_RECORDING_MS);
+    return () => clearTimeout(timer);
+  }, [voiceMode, handleVoiceStop]);
 
   // Handle feedback submit
   const handleFeedbackSubmit = useCallback(async () => {
@@ -272,7 +302,7 @@ export default function NewChatInterface() {
 
       {/* Voice overlay */}
       {showVoiceOverlay && (
-        <VoiceOverlay onCancel={handleVoiceCancel} />
+        <VoiceOverlay onStop={handleVoiceStop} onCancel={handleVoiceCancel} />
       )}
 
       {/* Feedback Modal */}

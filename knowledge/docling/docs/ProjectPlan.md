@@ -135,6 +135,7 @@
 
 | Feature | Completed | Documentation |
 |---------|-----------|---------------|
+| Mobile Mic Stop Fix | 2026-05-01 | `docs/archive/mobile-mic-stop-fix/` |
 | Mobile-First Chat UI Redesign | 2026-01-31 | `docs/archive/chat-redesign/` |
 | KB Park Animals Expansion | 2026-01-25 | `docs/active/kb-park-animals/` |
 | Park Inventory Integration | 2026-01-25 | `docs/active/park-inventory-integration/` |
