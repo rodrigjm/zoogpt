@@ -103,3 +103,6 @@ temp/
 
 # Exclude Qdrant data
 qdrant_data/
+
+# Agent scratch space — ephemeral, never source
+.superpowers/
