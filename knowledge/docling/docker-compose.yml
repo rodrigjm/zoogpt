@@ -86,7 +86,7 @@ services:
       dockerfile: Dockerfile
     container_name: zoocari-api
     ports:
-      - "8000:8000"
+      - "8002:8000"
     volumes:
       # Persist data (LanceDB, sessions, config)
       - ./data:/app/data
